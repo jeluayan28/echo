@@ -22,4 +22,4 @@ export {
 } from './TabBar';
 export { Text, type TextProps, type TextTone } from './Text';
 export { TextField, type TextFieldProps } from './TextField';
-export { ToastProvider, useToast, type ToastTone } from './Toast';
+export { ToastProvider, useToast, type ToastApi, type ToastOptions, type ToastTone } from './Toast';

@@ -27,6 +27,8 @@ export type MemoryCardProps = {
   pinned?: boolean;
   /** Number of linked memories — surfaced in cyan as a connection highlight. */
   linkCount?: number;
+  /** Type-specific detail shown after the date: a voice memo's length, a link's site. */
+  meta?: string;
   onPress?: () => void;
 };
 
@@ -39,12 +41,14 @@ export function MemoryCard({
   favorite,
   pinned,
   linkCount = 0,
+  meta: extra,
   onPress,
 }: MemoryCardProps) {
   const meta = typeMeta[type];
   const a11y = [
     `${meta.label}: ${title}`,
     date,
+    extra,
     pinned && 'pinned',
     favorite && 'favorite',
     linkCount > 0 && `${linkCount} connections`,
@@ -89,8 +93,8 @@ export function MemoryCard({
       )}
 
       <View style={styles.footer}>
-        <Text variant="caption" tone="muted">
-          {date}
+        <Text variant="caption" tone="muted" numberOfLines={1} style={styles.flex}>
+          {extra ? `${date} · ${extra}` : date}
         </Text>
         {linkCount > 0 && (
           <View style={styles.links}>

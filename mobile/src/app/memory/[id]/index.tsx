@@ -1,26 +1,37 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader, SectionHeader } from '@/components/layout';
 import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Text, useToast } from '@/components/ui';
-import { memoryActions, useMemories, useMemory } from '@/data/hooks';
+import { memoryActions, useCollection, useMemories, useMemory } from '@/data/hooks';
+import { deleteMemoryWithUndo } from '@/features/memory/delete-memory';
 import { LinkSheet } from '@/features/memory/LinkSheet';
 import { MemoryList } from '@/features/memory/MemoryList';
 import { VoicePlayer } from '@/features/memory/VoicePlayer';
-import { formatRelative } from '@/lib/format';
+import { formatBytes } from '@/lib/files';
+import { formatActivity, formatDuration } from '@/lib/format';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
 import { spacing } from '@/theme';
 
 const typeLabel = { note: 'Note', idea: 'Idea', link: 'Link', voice: 'Voice memo' } as const;
 
+const hostOf = (url: string) => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+};
+
 export default function MemoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const goBack = useSafeBack();
   const toast = useToast();
   const memory = useMemory(id);
+  const collection = useCollection(memory?.collectionId);
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -40,6 +51,8 @@ export default function MemoryDetailScreen() {
   }
 
   const linked = all.filter((m) => memory.linkedIds.includes(m.id));
+  const attachment = memory.attachment;
+  const edited = memory.updatedAt !== memory.createdAt;
 
   return (
     <Screen
@@ -72,26 +85,44 @@ export default function MemoryDetailScreen() {
     >
       <Text variant="display">{memory.title}</Text>
       <Text variant="caption" tone="muted">
-        {formatRelative(memory.createdAt)}
+        Created {formatActivity(memory.createdAt)}
+        {edited ? ` · Edited ${formatActivity(memory.updatedAt)}` : ''}
       </Text>
 
-      {memory.audioUri && <VoicePlayer uri={memory.audioUri} durationMs={memory.audioDurationMs} />}
+      {attachment && (
+        <View style={{ gap: spacing.xxs }}>
+          <VoicePlayer uri={attachment.uri} durationMs={attachment.durationMs} />
+          <Text variant="caption" tone="muted">
+            {[attachment.durationMs ? formatDuration(attachment.durationMs) : '', formatBytes(attachment.sizeBytes)]
+              .filter(Boolean)
+              .join(' · ')}
+          </Text>
+        </View>
+      )}
 
-      {memory.url && (
-        <View style={{ flexDirection: 'row' }}>
+      {memory.sourceUrl && (
+        <View style={styles.block}>
           <Button
-            label="Open link"
+            label={`Open ${hostOf(memory.sourceUrl)}`}
             icon="link"
             variant="secondary"
-            onPress={() => WebBrowser.openBrowserAsync(memory.url!)}
+            onPress={() => WebBrowser.openBrowserAsync(memory.sourceUrl!)}
           />
         </View>
       )}
 
       {memory.body ? <Text variant="body">{memory.body}</Text> : null}
 
-      {memory.tags.length > 0 && (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs }}>
+      {(collection || memory.tags.length > 0) && (
+        <View style={styles.chips}>
+          {collection && (
+            <Chip
+              label={collection.name}
+              icon="collection"
+              selected
+              onPress={() => router.push(routes.collection(collection.id))}
+            />
+          )}
           {memory.tags.map((t) => (
             <Chip key={t} label={t} onPress={() => router.push(routes.searchResults({ tag: t }))} />
           ))}
@@ -100,7 +131,7 @@ export default function MemoryDetailScreen() {
 
       <SectionHeader title="Linked memories" />
       {linked.length > 0 && <MemoryList memories={linked} />}
-      <View style={{ flexDirection: 'row' }}>
+      <View style={styles.block}>
         <Button label="Link a memory" icon="link" variant="secondary" onPress={() => setLinking(true)} />
       </View>
 
@@ -110,15 +141,14 @@ export default function MemoryDetailScreen() {
         visible={confirmDelete}
         destructive
         title="Delete this memory?"
-        message="It will be removed along with its links. This can’t be undone."
+        message="You’ll be able to undo this for a few seconds."
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(false)}
         onConfirm={async () => {
           setConfirmDelete(false);
           try {
-            await memoryActions.remove(memory.id);
+            await deleteMemoryWithUndo(memory.id, toast);
             goBack();
-            toast.show('Memory deleted', 'success');
           } catch {
             toast.show('Couldn’t delete. Please try again.', 'error');
           }
@@ -127,3 +157,8 @@ export default function MemoryDetailScreen() {
     </Screen>
   );
 }
+
+const styles = StyleSheet.create({
+  block: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+});

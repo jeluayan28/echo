@@ -1,51 +1,26 @@
 import { router, useLocalSearchParams } from 'expo-router';
 
-import { ScreenHeader } from '@/components/layout';
-import { Screen, useToast } from '@/components/ui';
-import { memoryActions } from '@/data/hooks';
 import type { MemoryType } from '@/data/types';
-import { MemoryForm } from '@/features/memory/MemoryForm';
+import { MemoryEditor } from '@/features/memory/MemoryEditor';
 import { routes } from '@/navigation/routes';
-import { useSafeBack } from '@/navigation/use-safe-back';
 
 const isType = (v: string | undefined): v is MemoryType =>
   v === 'note' || v === 'idea' || v === 'link' || v === 'voice';
 
-const titles: Record<MemoryType, string> = {
-  note: 'New note',
-  idea: 'New idea',
-  link: 'New link',
-  voice: 'New voice memo',
-};
-
-/** Presented as a modal (see root layout). `?type=` preselects the memory type. */
+/**
+ * Presented as a modal (see root layout).
+ * `?type=` preselects the memory type; `?collectionId=` preselects a collection.
+ */
 export default function NewMemoryScreen() {
-  const goBack = useSafeBack();
-  const toast = useToast();
-  const { type: typeParam } = useLocalSearchParams<{ type?: string }>();
-  const type = isType(typeParam) ? typeParam : undefined;
+  const { type, collectionId } = useLocalSearchParams<{ type?: string; collectionId?: string }>();
 
   return (
-    <Screen
-      scroll
-      keyboardAvoiding
-      edges={['top', 'bottom']}
-      header={<ScreenHeader title={type ? titles[type] : 'New memory'} onBack={goBack} backIcon="close" />}
-    >
-      <MemoryForm
-        initialType={type}
-        submitLabel="Save memory"
-        onSubmit={async (input) => {
-          try {
-            const memory = await memoryActions.create(input);
-            // Replace the modal so Back from the detail returns to where capture started.
-            router.replace(routes.memory(memory.id));
-            toast.show('Memory saved', 'success');
-          } catch {
-            toast.show('Couldn’t save. Please try again.', 'error');
-          }
-        }}
-      />
-    </Screen>
+    <MemoryEditor
+      mode="create"
+      initialType={isType(type) ? type : undefined}
+      initialCollectionId={collectionId}
+      // Replace the modal so Back from the detail returns to where capture started.
+      onSaved={(id) => router.replace(routes.memory(id))}
+    />
   );
 }

@@ -29,10 +29,10 @@ export function useMemories(): Memory[] {
 
 export function useFilteredMemories(filter: MemoryFilter): Memory[] {
   const { memories } = useStoreState();
-  const { query, type, tag, favoritesOnly } = filter;
+  const { query, type, tag, favoritesOnly, untaggedOnly, collectionId } = filter;
   return useMemo(
-    () => filterMemories(memories, { query, type, tag, favoritesOnly }),
-    [memories, query, type, tag, favoritesOnly],
+    () => filterMemories(memories, { query, type, tag, favoritesOnly, untaggedOnly, collectionId }),
+    [memories, query, type, tag, favoritesOnly, untaggedOnly, collectionId],
   );
 }
 
@@ -64,11 +64,21 @@ export function useConnections() {
 export const memoryActions = {
   create: repository.createMemory.bind(repository),
   update: repository.updateMemory.bind(repository),
+  /** Soft delete — pair with `restore` (undo) and `purge` (permanent, after the undo window). */
   remove: repository.deleteMemory.bind(repository),
+  restore: repository.restoreMemory.bind(repository),
+  purge: repository.purgeMemory.bind(repository),
+  upload: repository.uploadAttachment.bind(repository),
   markOpened: repository.markOpened.bind(repository),
   link: repository.linkMemories.bind(repository),
   unlink: repository.unlinkMemories.bind(repository),
   dismissRediscovery: repository.dismissRediscovery.bind(repository),
+};
+
+export const collectionActions = {
+  create: repository.createCollection.bind(repository),
+  update: repository.updateCollection.bind(repository),
+  remove: repository.deleteCollection.bind(repository),
 };
 
 // ── Memory Core dashboard ──────────────────────────────────────────────────────

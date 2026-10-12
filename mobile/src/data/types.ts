@@ -1,28 +1,44 @@
 /**
  * Domain types shared by the UI and the (future) API client.
- * Field names intentionally mirror the planned Laravel resources (snake_case → camelCase at the API boundary).
+ * Field names mirror the planned Laravel resources (snake_case ↔ camelCase at the API boundary).
  */
 
 export type MemoryType = 'note' | 'idea' | 'link' | 'voice';
+
+/**
+ * Metadata for a file that lives OUTSIDE the database (device file now, object storage later).
+ * The database only ever stores this record and the `uri`/storage reference — never the bytes.
+ */
+export type Attachment = {
+  id: string;
+  kind: 'audio';
+  /** Storage reference: a local file URI in the sample stage, an object-storage key/URL later. */
+  uri: string;
+  mimeType: string;
+  sizeBytes?: number;
+  durationMs?: number;
+};
 
 export type Memory = {
   id: string;
   type: MemoryType;
   title: string;
+  /** The note/idea text, a link's description, or optional notes on a voice memo. */
   body: string;
-  /** Only for `link` memories. */
-  url?: string;
-  /** Only for `voice` memories: local file URI (later: object-storage URL) and length. */
-  audioUri?: string;
-  audioDurationMs?: number;
+  /** Required for `link` memories; optional "source" for note/idea. Always http(s). */
+  sourceUrl?: string;
+  /** Present on `voice` memories. */
+  attachment?: Attachment;
+  /** Normalized: lowercase, trimmed, unique. May be empty (untagged memories are valid). */
   tags: string[];
-  collectionIds: string[];
+  /** A memory belongs to at most one collection. */
+  collectionId?: string;
   /** Ids of memories linked to this one (derived from `Link`s; Neural Map edges). */
   linkedIds: string[];
   favorite: boolean;
   pinned: boolean;
   createdAt: string; // ISO 8601
-  /** Last time the user changed the content. */
+  /** Last time the user changed the content or organization (collection). Not favorite/pin toggles. */
   updatedAt: string; // ISO 8601
   /** Last time the user opened the detail screen. Never changes `updatedAt`. */
   lastOpenedAt?: string; // ISO 8601
@@ -33,6 +49,8 @@ export type Collection = {
   name: string;
   description?: string;
 };
+
+export type CollectionInput = Pick<Collection, 'name' | 'description'>;
 
 /** A user-created relationship between two memories. */
 export type Link = {
@@ -47,6 +65,22 @@ export type Profile = {
   email?: string;
 };
 
-/** What the create/edit form can set. */
+/** What the create/edit form produces. `attachment` must already be uploaded. */
 export type MemoryInput = Pick<Memory, 'type' | 'title' | 'body' | 'tags' | 'favorite' | 'pinned'> &
-  Partial<Pick<Memory, 'url' | 'audioUri' | 'audioDurationMs'>>;
+  Partial<Pick<Memory, 'sourceUrl' | 'attachment' | 'collectionId'>>;
+
+/** A recording on the device that has not been uploaded yet. */
+export type LocalFile = {
+  uri: string;
+  mimeType: string;
+  sizeBytes?: number;
+  durationMs?: number;
+};
+
+/** A deleted memory kept briefly so the delete can be undone. */
+export type TrashedMemory = {
+  memory: Memory;
+  /** Links removed together with the memory, restored with it if their other end still exists. */
+  links: Link[];
+  deletedAt: string;
+};

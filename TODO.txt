@@ -1,0 +1,73 @@
+ECHO - TO DO LIST
+=================
+Updated: 2026-10-12
+
+WHERE YOU ARE
+-------------
+Phase: the mobile app is built and works on SAMPLE DATA. The BACKEND is not connected.
+In the original build order that is roughly: steps 2, 3, 4 and 6 done on the mobile side,
+step 1 (database + auth) and the API NOT done, steps 5, 7 and 8 only partly done.
+
+DONE
+----
+[x] Project setup: Expo SDK 57 app (mobile/) + Laravel 12 backend (backend/)
+[x] Design system (colors, Inter font, buttons, inputs, cards, sheets, toasts, etc.)
+[x] Navigation: 5 tabs (Core, Map, Capture, Search, Vault) + secondary screens
+[x] Memory Core dashboard (status, quick capture, continue exploring, rediscover, connections)
+[x] Memory management: create / view / edit / delete with Undo / pin / favorite / tags
+[x] Collections: create, rename, delete, empty collections
+[x] Voice memos: record, playback, permissions, upload with retry / cancel
+[x] Unsaved-changes protection on forms
+[x] Search + filters (basic)
+[x] Link memories to each other (from the memory detail screen)
+[x] 68 mobile unit tests + 10 Laravel schema tests
+[x] Database schema written (Laravel migrations + models)
+
+TO DO - NEXT UP (backend, the big missing piece)
+------------------------------------------------
+[ ] 1. Create the Postgres database and set DB_PASSWORD in backend/.env
+        psql -U postgres -c "CREATE DATABASE echo;"   then: php artisan migrate
+[ ] 2. Run the migrations on real PostgreSQL (so far only tested on SQLite)
+[ ] 3. Auth API with Sanctum: register, login, logout, profile
+[ ] 4. Memories API: list, create, show, update, delete, restore, search
+[ ] 5. Collections, Tags and Links API
+[ ] 6. File upload endpoint for voice recordings (local disk now, S3 later)
+[ ] 7. Server-side validation (FormRequests) - the server must re-validate everything
+[ ] 8. Backend tests for every endpoint (including "user A can't see user B's data")
+
+TO DO - CONNECT THE APP TO THE BACKEND
+--------------------------------------
+[ ] 9.  Write api-repository.ts (replaces the sample repository; one line change in repository.ts)
+[ ] 10. Store the login token securely (expo-secure-store)
+[ ] 11. Make login / register screens real (they only validate right now)
+[ ] 12. Set EXPO_PUBLIC_API_URL; handle offline / network errors
+[ ] 13. Delete the sample data files when done
+
+TO DO - REMAINING FEATURES
+--------------------------
+[ ] Neural Map: real interactive graph (react-native-svg + pan/zoom). Right now it only lists links
+[ ] Daily memory summary + rediscovery reminders (expo-notifications, needs a dev build)
+[ ] Settings that work: profile, theme, privacy, notifications (currently greyed out "Soon")
+[ ] Search: debounce, highlight matches, server-side search
+
+TO DO - BEFORE RELEASE
+----------------------
+[ ] Test on a REAL phone (nothing was run on a device yet):
+      - voice recording + microphone permission prompt
+      - on-screen keyboard in forms
+      - Android back button / iOS swipe with the "discard changes?" prompt
+      - pull-to-refresh on the dashboard
+[ ] Test on iOS and Android emulators / small and big screens
+[ ] Move voice files to S3-compatible storage for production
+[ ] Pagination for long memory lists (swap map() for FlatList)
+[ ] Accessibility check with a screen reader (TalkBack / VoiceOver)
+[ ] Build with EAS (development build for audio/notifications, then store builds)
+[ ] Rotate any secrets, set production .env, HTTPS API
+
+SMALL NOTES
+-----------
+- Run the app:   cd mobile ; npx expo start     (scan QR with Expo Go)
+- Run tests:     cd mobile ; npm test           |   cd backend ; php artisan test
+- Data resets on every app reload until the backend is connected.
+- Docs: mobile/docs/DESIGN_SYSTEM.md, NAVIGATION.md, MEMORIES.md
+- Git: this folder sits inside your HOME git repo. Run "git init" inside echo/ so ECHO has its own repo.

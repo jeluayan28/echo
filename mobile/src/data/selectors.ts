@@ -7,6 +7,9 @@ export type MemoryFilter = {
   type?: MemoryType;
   tag?: string;
   favoritesOnly?: boolean;
+  /** Only memories with no tags. */
+  untaggedOnly?: boolean;
+  collectionId?: string;
 };
 
 const DAY_MS = 86_400_000;
@@ -23,6 +26,8 @@ export function filterMemories(memories: Memory[], f: MemoryFilter): Memory[] {
     if (f.type && m.type !== f.type) return false;
     if (f.tag && !m.tags.includes(f.tag)) return false;
     if (f.favoritesOnly && !m.favorite) return false;
+    if (f.untaggedOnly && m.tags.length > 0) return false;
+    if (f.collectionId && m.collectionId !== f.collectionId) return false;
     if (!q) return true;
     return (
       m.title.toLowerCase().includes(q) ||

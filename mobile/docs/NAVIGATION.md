@@ -9,10 +9,10 @@
 | `/capture` | `(tabs)/capture.tsx` | Never shown: redirects to `/memory/new` |
 | `/search` | `(tabs)/search.tsx` | Query + type filter + browse by tag |
 | `/vault` | `(tabs)/vault.tsx` | All · Collections · Tags · Favorites |
-| `/memory/[id]` | `memory/[id]/index.tsx` | Detail: pin, favorite, edit, delete, open link |
-| `/memory/new` | `memory/new.tsx` | Modal. Save → replaces modal with the new memory's detail |
+| `/memory/[id]` | `memory/[id]/index.tsx` | Detail: pin, favorite, edit, delete (with Undo), play audio, open link, link memories |
+| `/memory/new?type&collectionId` | `memory/new.tsx` | Modal. Save → replaces modal with the new memory's detail. See [MEMORIES.md](MEMORIES.md) |
 | `/memory/[id]/edit` | `memory/[id]/edit.tsx` | Modal. Save → back to detail |
-| `/collection/[id]` | `collection/[id].tsx` | Collection detail |
+| `/collection/[id]` | `collection/[id].tsx` | Collection detail: rename, delete (memories kept), add a memory. Deleting returns to the Vault |
 | `/search-results?q&type&tag` | `search-results.tsx` | Filters live in URL params |
 | `/settings` | `settings.tsx` | Profile & settings (opened from the Core header) |
 | `/login`, `/register` | `(auth)/*.tsx` | Switch between each other with `replace` |
@@ -56,7 +56,8 @@ To connect the API: implement `EchoRepository`, change the one export in `reposi
 `sample-*.ts` / `store.ts`. Sample data resets on reload.
 
 Dev/test hooks (only when `__DEV__`): `window.__ECHO_FAIL_FIRST_SYNC = n` before load makes the first
-`n` syncs fail; `__echoSample.failNextSync(n)` and `__echoSample.deleteAll()` from the console.
+`n` syncs fail; from the console: `__echoSample.failNextSync(n)`, `failNextUpload(n)` (drops an upload
+halfway), `setLatency({ uploadStep })`, `deleteAll()`.
 
 ## Memory Core dashboard (`(tabs)/index.tsx`)
 

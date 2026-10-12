@@ -5,15 +5,24 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { colors, elevation, radius, spacing, useLayout } from '@/theme';
 
+import { Button } from './Button';
 import { Icon, type IconName } from './Icon';
 import { Text } from './Text';
 
 export type ToastTone = 'success' | 'error' | 'info';
 
-type ToastState = { id: number; message: string; tone: ToastTone };
+export type ToastOptions = {
+  /** A single action, e.g. "Undo". Pressing it dismisses the toast. */
+  action?: { label: string; onPress: () => void };
+  /** How long the toast stays. Toasts with an action default to longer so they can be reached. */
+  durationMs?: number;
+};
 
-type ToastApi = {
-  show: (message: string, tone?: ToastTone) => void;
+type ToastState = { id: number; message: string; tone: ToastTone; options?: ToastOptions };
+
+export type ToastApi = {
+  show: (message: string, tone?: ToastTone, options?: ToastOptions) => void;
+  dismiss: () => void;
 };
 
 const ToastContext = createContext<ToastApi | null>(null);
@@ -24,7 +33,8 @@ const toneMeta: Record<ToastTone, { icon: IconName; color: string; tint: string 
   info: { icon: 'info', color: colors.cyan, tint: colors.cyanTint },
 };
 
-const DURATION_MS = 3200;
+const DEFAULT_MS = 3200;
+const ACTION_MS = 6000;
 
 /** Wrap the app once; call `useToast().show('Saved', 'success')` anywhere inside. */
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -33,11 +43,16 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const insets = useSafeAreaInsets();
   const { gutter } = useLayout();
 
-  const show = useCallback((message: string, tone: ToastTone = 'info') => {
+  const dismiss = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
-    setToast({ id: Date.now(), message, tone });
-    AccessibilityInfo.announceForAccessibility(message);
-    timer.current = setTimeout(() => setToast(null), DURATION_MS);
+    setToast(null);
+  }, []);
+
+  const show = useCallback((message: string, tone: ToastTone = 'info', options?: ToastOptions) => {
+    if (timer.current) clearTimeout(timer.current);
+    setToast({ id: Date.now(), message, tone, options });
+    AccessibilityInfo.announceForAccessibility(options?.action ? `${message}. ${options.action.label} available.` : message);
+    timer.current = setTimeout(() => setToast(null), options?.durationMs ?? (options?.action ? ACTION_MS : DEFAULT_MS));
   }, []);
 
   useEffect(
@@ -47,15 +62,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const api = useMemo(() => ({ show }), [show]);
+  const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
+  const action = toast?.options?.action;
 
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <View
-        pointerEvents="none"
-        style={[styles.host, { top: insets.top + spacing.xs, paddingHorizontal: gutter }]}
-      >
+      {/* box-none: the host never blocks touches; only the toast itself is interactive */}
+      <View pointerEvents="box-none" style={[styles.host, { top: insets.top + spacing.xs, paddingHorizontal: gutter }]}>
         {toast && (
           <Animated.View
             key={toast.id}
@@ -70,6 +84,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <Text variant="body" style={styles.message}>
               {toast.message}
             </Text>
+            {action && (
+              <Button
+                label={action.label}
+                variant="ghost"
+                onPress={() => {
+                  dismiss();
+                  action.onPress();
+                }}
+                style={styles.action}
+              />
+            )}
           </Animated.View>
         )}
       </View>
@@ -105,4 +130,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   message: { flex: 1 },
+  action: { paddingHorizontal: spacing.sm, minHeight: 40 },
 });
