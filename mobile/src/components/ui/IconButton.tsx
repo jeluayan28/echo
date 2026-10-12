@@ -18,7 +18,7 @@ export function IconButton({
   icon,
   label,
   variant = 'plain',
-  active = false,
+  active,
   style,
   ...rest
 }: IconButtonProps) {
@@ -27,7 +27,9 @@ export function IconButton({
     <PressableScale
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ selected: active, disabled: !!rest.disabled }}
+      accessibilityState={{ selected: !!active, disabled: !!rest.disabled }}
+      // Only toggle buttons (those that pass `active`) should announce a pressed state.
+      aria-pressed={active}
       hitSlop={4}
       style={[
         styles.base,

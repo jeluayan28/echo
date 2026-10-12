@@ -45,6 +45,7 @@ export function Switch({ value, onValueChange, label, description, disabled }: S
       accessibilityLabel={label}
       accessibilityHint={description}
       accessibilityState={{ checked: value, disabled: !!disabled }}
+      aria-checked={value}
       disabled={disabled}
       onPress={() => {
         if (process.env.EXPO_OS !== 'web') Haptics.selectionAsync();

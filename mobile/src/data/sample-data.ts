@@ -1,11 +1,14 @@
 /**
  * SAMPLE DATA — development only.
  * Seeds the in-memory store so screens have something to show before the Laravel API exists.
- * Nothing outside `store.ts` should import this file. Delete it when the API is connected.
+ * Nothing outside `sample-repository.ts` should import this file. Delete it when the API is connected.
  */
-import type { Collection, Memory } from './types';
+import type { Collection, Link, Memory, Profile } from './types';
 
-const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString();
+const hoursAgo = (n: number) => new Date(Date.now() - n * 3_600_000).toISOString();
+const daysAgo = (n: number) => hoursAgo(n * 24);
+
+export const sampleProfile: Profile = { name: 'Jelli' };
 
 export const sampleCollections: Collection[] = [
   { id: 'c1', name: 'Product ideas', description: 'Things worth building' },
@@ -13,7 +16,9 @@ export const sampleCollections: Collection[] = [
   { id: 'c3', name: 'Life admin' },
 ];
 
-export const sampleMemories: Memory[] = [
+type SeedMemory = Omit<Memory, 'linkedIds'>;
+
+const seed: SeedMemory[] = [
   {
     id: 'm1',
     type: 'idea',
@@ -21,11 +26,11 @@ export const sampleMemories: Memory[] = [
     body: 'A second brain should bring back old thoughts, weighted by how connected they are to what I wrote recently.',
     tags: ['product', 'rediscovery'],
     collectionIds: ['c1'],
-    linkedIds: ['m2', 'm4'],
     favorite: true,
     pinned: true,
-    createdAt: daysAgo(2),
+    createdAt: daysAgo(12),
     updatedAt: daysAgo(2),
+    lastOpenedAt: daysAgo(2),
   },
   {
     id: 'm2',
@@ -35,11 +40,11 @@ export const sampleMemories: Memory[] = [
     url: 'https://example.com/hippocampal-replay',
     tags: ['neuroscience', 'rediscovery'],
     collectionIds: ['c2'],
-    linkedIds: ['m1'],
     favorite: false,
     pinned: false,
-    createdAt: daysAgo(6),
-    updatedAt: daysAgo(6),
+    createdAt: daysAgo(30),
+    updatedAt: daysAgo(30),
+    lastOpenedAt: daysAgo(18),
   },
   {
     id: 'm3',
@@ -48,11 +53,11 @@ export const sampleMemories: Memory[] = [
     body: 'Keep sign-up to two screens. Ask for the first memory before asking for notification permission.',
     tags: ['product', 'ux'],
     collectionIds: ['c1'],
-    linkedIds: ['m4'],
     favorite: false,
     pinned: true,
-    createdAt: daysAgo(1),
-    updatedAt: daysAgo(1),
+    createdAt: daysAgo(3),
+    updatedAt: hoursAgo(5),
+    lastOpenedAt: hoursAgo(5),
   },
   {
     id: 'm4',
@@ -61,11 +66,11 @@ export const sampleMemories: Memory[] = [
     body: 'Nodes that share tags drift closer together; manual links draw cyan edges.',
     tags: ['product', 'map'],
     collectionIds: ['c1'],
-    linkedIds: ['m1', 'm3'],
     favorite: true,
     pinned: false,
     createdAt: daysAgo(9),
     updatedAt: daysAgo(9),
+    lastOpenedAt: daysAgo(1),
   },
   {
     id: 'm5',
@@ -74,11 +79,10 @@ export const sampleMemories: Memory[] = [
     body: 'Appointment needs to be booked at least six weeks before travel.',
     tags: ['admin'],
     collectionIds: ['c3'],
-    linkedIds: [],
     favorite: false,
     pinned: false,
-    createdAt: daysAgo(14),
-    updatedAt: daysAgo(14),
+    createdAt: daysAgo(45),
+    updatedAt: daysAgo(45),
   },
   {
     id: 'm6',
@@ -88,10 +92,26 @@ export const sampleMemories: Memory[] = [
     url: 'https://example.com/local-first',
     tags: ['engineering', 'reading'],
     collectionIds: ['c2'],
-    linkedIds: [],
     favorite: false,
     pinned: false,
     createdAt: daysAgo(21),
     updatedAt: daysAgo(21),
+    lastOpenedAt: daysAgo(14),
   },
 ];
+
+export const sampleLinks: Link[] = [
+  { id: 'l1', fromId: 'm4', toId: 'm1', createdAt: daysAgo(1) },
+  { id: 'l2', fromId: 'm3', toId: 'm4', createdAt: daysAgo(3) },
+  { id: 'l3', fromId: 'm2', toId: 'm1', createdAt: daysAgo(8) },
+];
+
+/** `linkedIds` is derived from links so the two can never disagree. */
+export function withLinkedIds(memories: SeedMemory[], links: Link[]): Memory[] {
+  return memories.map((m) => ({
+    ...m,
+    linkedIds: links.flatMap((l) => (l.fromId === m.id ? [l.toId] : l.toId === m.id ? [l.fromId] : [])),
+  }));
+}
+
+export const sampleMemories: Memory[] = withLinkedIds(seed, sampleLinks);

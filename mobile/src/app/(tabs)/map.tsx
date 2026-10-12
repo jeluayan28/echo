@@ -1,25 +1,22 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { ListRow, ScreenHeader, SectionHeader } from '@/components/layout';
-import { EmptyState, Screen } from '@/components/ui';
-import { useMemories } from '@/data/hooks';
-import { connectionPairs } from '@/data/selectors';
-import { StatTile } from '@/features/core/StatTile';
+import { EmptyState, Screen, Text } from '@/components/ui';
+import { useConnections, useMemories } from '@/data/hooks';
+import { formatRelative, pluralize } from '@/lib/format';
 import { routes } from '@/navigation/routes';
 import { spacing } from '@/theme';
 
 export default function NeuralMapScreen() {
   const memories = useMemories();
-  const pairs = useMemo(() => connectionPairs(memories), [memories]);
+  const connections = useConnections();
 
   return (
     <Screen scroll header={<ScreenHeader size="large" eyebrow="Connections" title="Neural Map" />}>
-      <View style={styles.stats}>
-        <StatTile label="Nodes" value={memories.length} />
-        <StatTile label="Links" value={pairs.length} highlight />
-      </View>
+      <Text variant="body" tone="muted">
+        {pluralize(memories.length, 'memory', 'memories')} · {pluralize(connections.length, 'link')}
+      </Text>
 
       <EmptyState
         icon="map"
@@ -28,17 +25,21 @@ export default function NeuralMapScreen() {
       />
 
       <SectionHeader title="Linked memories" />
-      {pairs.length === 0 ? (
-        <EmptyState icon="link" title="No links yet" message="Manually linking memories arrives in a later build step." />
+      {connections.length === 0 ? (
+        <EmptyState
+          icon="link"
+          title="No links yet"
+          message="Open a memory and tap “Link a memory” to connect it to another."
+        />
       ) : (
-        <View style={styles.list}>
-          {pairs.map(([a, b]) => (
+        <View style={{ gap: spacing.xs }}>
+          {connections.map(({ link, from, to }) => (
             <ListRow
-              key={`${a.id}-${b.id}`}
+              key={link.id}
               icon="link"
-              title={a.title}
-              subtitle={`Linked to ${b.title}`}
-              onPress={() => router.push(routes.memory(a.id))}
+              title={from.title}
+              subtitle={`Linked to ${to.title} · ${formatRelative(link.createdAt)}`}
+              onPress={() => router.push(routes.memory(from.id))}
             />
           ))}
         </View>
@@ -46,8 +47,3 @@ export default function NeuralMapScreen() {
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  stats: { flexDirection: 'row', gap: spacing.xs },
-  list: { gap: spacing.xs },
-});

@@ -46,6 +46,7 @@ export const TabBarButton = forwardRef<View, TabBarButtonProps>(function TabBarB
       accessibilityRole="tab"
       accessibilityLabel={label}
       accessibilityState={{ selected: isFocused }}
+      aria-selected={isFocused}
       onPress={(e) => {
         if (!isFocused && process.env.EXPO_OS !== 'web') Haptics.selectionAsync();
         onPress?.(e);

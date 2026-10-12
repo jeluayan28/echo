@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import {
   KeyboardAvoidingView,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -22,6 +23,9 @@ export type ScreenProps = {
   /** Safe-area edges to pad. Tabs handle the bottom edge themselves, so default is top only. */
   edges?: Edge[];
   contentStyle?: StyleProp<ViewStyle>;
+  /** Pull-to-refresh (scroll screens only). Provide both props to enable it. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 };
 
 /** Page wrapper: void background, safe areas, responsive gutters, readable max width. */
@@ -32,6 +36,8 @@ export function Screen({
   keyboardAvoiding = false,
   edges = ['top'],
   contentStyle,
+  onRefresh,
+  refreshing = false,
 }: ScreenProps) {
   const { gutter } = useLayout();
   const column = [styles.column, { paddingHorizontal: gutter }];
@@ -42,6 +48,17 @@ export function Screen({
       keyboardDismissMode="on-drag"
       contentContainerStyle={styles.scrollContent}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.violet}
+            colors={[colors.violet]}
+            progressBackgroundColor={colors.surfaceAlt}
+          />
+        ) : undefined
+      }
     >
       <View style={[column, styles.body, contentStyle]}>{children}</View>
     </ScrollView>

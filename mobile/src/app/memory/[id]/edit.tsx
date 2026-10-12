@@ -23,10 +23,14 @@ export default function EditMemoryScreen() {
         <MemoryForm
           initial={memory}
           submitLabel="Save changes"
-          onSubmit={(input) => {
-            memoryActions.update(memory.id, input);
-            goBack();
-            toast.show('Changes saved', 'success');
+          onSubmit={async (input) => {
+            try {
+              await memoryActions.update(memory.id, input);
+              goBack();
+              toast.show('Changes saved', 'success');
+            } catch {
+              toast.show('Couldn’t save changes. Please try again.', 'error');
+            }
           }}
         />
       ) : (

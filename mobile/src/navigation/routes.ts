@@ -34,12 +34,13 @@ export const routes = {
   map: '/map' as Href,
   search: '/search' as Href,
   vault: '/vault' as Href,
-  newMemory: '/memory/new' as Href,
   settings: '/settings' as Href,
   login: '/login' as Href,
   register: '/register' as Href,
   designSystem: '/design-system' as Href,
 
+  /** Opens the create flow, optionally preselecting a memory type. */
+  newMemory: (type?: MemoryType): Href => ({ pathname: '/memory/new', params: type ? { type } : {} }),
   memory: (id: string): Href => ({ pathname: '/memory/[id]', params: { id } }),
   editMemory: (id: string): Href => ({ pathname: '/memory/[id]/edit', params: { id } }),
   collection: (id: string): Href => ({ pathname: '/collection/[id]', params: { id } }),

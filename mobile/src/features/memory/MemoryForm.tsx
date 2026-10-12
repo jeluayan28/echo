@@ -1,18 +1,20 @@
 import { useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { Button, Chip, Switch, Text, TextField } from '@/components/ui';
+import { Button, Chip, Switch, TextField } from '@/components/ui';
 import type { Memory, MemoryInput, MemoryType } from '@/data/types';
 import { spacing } from '@/theme';
 
-/** Voice memories need recording support, which arrives in a later build step. */
-const formTypes: { type: Exclude<MemoryType, 'voice'>; label: string }[] = [
+import { VoiceRecorder, type VoiceValue } from './VoiceRecorder';
+
+const formTypes: { type: MemoryType; label: string }[] = [
   { type: 'note', label: 'Note' },
   { type: 'idea', label: 'Idea' },
   { type: 'link', label: 'Link' },
+  { type: 'voice', label: 'Voice' },
 ];
 
-type Errors = { title?: string; url?: string };
+type Errors = { title?: string; url?: string; voice?: string };
 
 function parseTags(raw: string): string[] {
   const tags = raw
@@ -31,53 +33,75 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
+const voiceTitle = () =>
+  `Voice memo · ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
+
 export type MemoryFormProps = {
   /** Present when editing. */
   initial?: Memory;
+  /** Preselected type when creating (from Quick Capture). */
+  initialType?: MemoryType;
   submitLabel: string;
-  onSubmit: (input: MemoryInput) => void;
+  onSubmit: (input: MemoryInput) => void | Promise<void>;
 };
 
 /** Create / edit form. Pure UI: the parent screen decides what "submit" does. */
-export function MemoryForm({ initial, submitLabel, onSubmit }: MemoryFormProps) {
-  const [type, setType] = useState<MemoryType>(initial?.type ?? 'note');
-  const [title, setTitle] = useState(initial?.title ?? '');
+export function MemoryForm({ initial, initialType, submitLabel, onSubmit }: MemoryFormProps) {
+  const startType = initial?.type ?? initialType ?? 'note';
+  const [type, setType] = useState<MemoryType>(startType);
+  const [title, setTitle] = useState(initial?.title ?? (startType === 'voice' ? voiceTitle() : ''));
   const [body, setBody] = useState(initial?.body ?? '');
   const [url, setUrl] = useState(initial?.url ?? '');
+  const [voice, setVoice] = useState<VoiceValue | undefined>(
+    initial?.audioUri ? { uri: initial.audioUri, durationMs: initial.audioDurationMs ?? 0 } : undefined,
+  );
   const [tags, setTags] = useState(initial?.tags.join(', ') ?? '');
   const [favorite, setFavorite] = useState(initial?.favorite ?? false);
   const [pinned, setPinned] = useState(initial?.pinned ?? false);
   const [errors, setErrors] = useState<Errors>({});
+  const [saving, setSaving] = useState(false);
 
   const bodyRef = useRef<TextInput>(null);
   const urlRef = useRef<TextInput>(null);
 
-  const submit = () => {
+  const chooseType = (next: MemoryType) => {
+    setType(next);
+    // Give a fresh voice memo a sensible default title if the user hasn't typed one.
+    if (next === 'voice' && !title.trim()) setTitle(voiceTitle());
+  };
+
+  const submit = async () => {
     const next: Errors = {};
     if (!title.trim()) next.title = 'Give this memory a title.';
     if (type === 'link' && !isHttpUrl(url.trim())) next.url = 'Enter a full link starting with https://';
+    if (type === 'voice' && !voice) next.voice = 'Record something first.';
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    onSubmit({
-      type,
-      title: title.trim(),
-      body: body.trim(),
-      url: type === 'link' ? url.trim() : undefined,
-      tags: parseTags(tags),
-      favorite,
-      pinned,
-    });
+    setSaving(true);
+    try {
+      await onSubmit({
+        type,
+        title: title.trim(),
+        body: body.trim(),
+        url: type === 'link' ? url.trim() : undefined,
+        audioUri: type === 'voice' ? voice?.uri : undefined,
+        audioDurationMs: type === 'voice' ? voice?.durationMs : undefined,
+        tags: parseTags(tags),
+        favorite,
+        pinned,
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <View style={styles.form}>
       <View style={styles.types} accessibilityRole="radiogroup">
         {formTypes.map((t) => (
-          <Chip key={t.type} label={t.label} selected={type === t.type} onPress={() => setType(t.type)} />
+          <Chip key={t.type} label={t.label} selected={type === t.type} onPress={() => chooseType(t.type)} />
         ))}
-        {/* An existing voice memory keeps its type; the form can't create one yet. */}
-        {type === 'voice' && <Chip label="Voice" selected />}
       </View>
 
       <TextField
@@ -115,9 +139,20 @@ export function MemoryForm({ initial, submitLabel, onSubmit }: MemoryFormProps) 
         />
       )}
 
+      {type === 'voice' && (
+        <VoiceRecorder
+          value={voice}
+          onChange={(v) => {
+            setVoice(v);
+            if (errors.voice) setErrors((e) => ({ ...e, voice: undefined }));
+          }}
+          error={errors.voice}
+        />
+      )}
+
       <TextField
         ref={bodyRef}
-        label={type === 'link' ? 'Why it matters' : 'Content'}
+        label={type === 'link' ? 'Why it matters' : type === 'voice' ? 'Notes (optional)' : 'Content'}
         placeholder="Write freely…"
         value={body}
         onChangeText={setBody}
@@ -139,18 +174,12 @@ export function MemoryForm({ initial, submitLabel, onSubmit }: MemoryFormProps) 
         <Switch label="Pin to Memory Core" value={pinned} onValueChange={setPinned} />
       </View>
 
-      {type !== 'voice' && (
-        <Text variant="caption" tone="muted">
-          Voice memories arrive in a later build step.
-        </Text>
-      )}
-
-      <Button label={submitLabel} fullWidth onPress={submit} />
+      <Button label={submitLabel} fullWidth loading={saving} onPress={submit} />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   form: { gap: spacing.md },
-  types: { flexDirection: 'row', gap: spacing.xs },
+  types: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
 });

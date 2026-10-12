@@ -8,5 +8,5 @@ import { routes } from '@/navigation/routes';
  * it forwards to the create-memory screen.
  */
 export default function CaptureRedirect() {
-  return <Redirect href={routes.newMemory} />;
+  return <Redirect href={routes.newMemory()} />;
 }

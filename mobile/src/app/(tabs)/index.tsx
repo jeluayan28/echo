@@ -1,84 +1,88 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
 
-import { ScreenHeader, SectionHeader } from '@/components/layout';
-import { EmptyState, IconButton, Screen } from '@/components/ui';
-import { useMemories } from '@/data/hooks';
-import { connectionPairs } from '@/data/selectors';
-import { RediscoverCard, pickRediscovery } from '@/features/core/RediscoverCard';
-import { StatTile } from '@/features/core/StatTile';
-import { MemoryList } from '@/features/memory/MemoryList';
+import { SectionHeader } from '@/components/layout';
+import { EmptyState, ErrorState, Screen, useToast } from '@/components/ui';
+import { useDashboard } from '@/data/hooks';
+import { ContinueExploring } from '@/features/core/ContinueExploring';
+import { DashboardSkeleton, StatusSkeleton } from '@/features/core/DashboardSkeleton';
+import { DashboardTopBar, Greeting } from '@/features/core/DashboardHeader';
+import { QuickCapture } from '@/features/core/QuickCapture';
+import { RecentConnections } from '@/features/core/RecentConnections';
+import { RediscoverSection } from '@/features/core/RediscoverSection';
+import { StatusPanel } from '@/features/core/StatusPanel';
 import { routes } from '@/navigation/routes';
-import { spacing } from '@/theme';
 
+/**
+ * Memory Core — the home dashboard.
+ * Top to bottom: top bar · greeting · status · quick capture · continue exploring ·
+ * rediscover · recent connections. Quick Capture never waits on data, so it is always usable.
+ */
 export default function MemoryCoreScreen() {
-  const memories = useMemories();
+  const toast = useToast();
+  const { status, refreshing, data, sync } = useDashboard();
 
-  const stats = useMemo(
-    () => ({
-      total: memories.length,
-      connections: connectionPairs(memories).length,
-      favorites: memories.filter((m) => m.favorite).length,
-    }),
-    [memories],
-  );
-  const rediscovery = useMemo(() => pickRediscovery(memories), [memories]);
-  const pinned = memories.filter((m) => m.pinned);
-  const recent = memories.slice(0, 3);
+  // Load once on mount, only when nothing has been fetched yet this session.
+  const needsInitialLoad = useRef(status === 'loading');
+  useEffect(() => {
+    if (needsInitialLoad.current) void sync('initial');
+  }, [sync]);
+
+  const onRefresh = async () => {
+    const ok = await sync('refresh');
+    if (!ok) toast.show('Couldn’t refresh. Showing your saved memories.', 'error');
+  };
+
+  const ready = status === 'ready';
+  const isEmpty = ready && data.memoryCount === 0;
 
   return (
     <Screen
       scroll
-      header={
-        <ScreenHeader
-          size="large"
-          eyebrow="Your second brain"
-          title="Memory Core"
-          actions={
-            <IconButton
-              icon="user"
-              label="Profile and settings"
-              variant="filled"
-              onPress={() => router.push(routes.settings)}
-            />
-          }
-        />
-      }
+      onRefresh={onRefresh}
+      refreshing={refreshing}
+      header={<DashboardTopBar name={data.profile.name} />}
     >
-      {memories.length === 0 ? (
+      <Greeting name={data.profile.name} />
+
+      {status === 'loading' && <StatusSkeleton />}
+      {ready && !isEmpty && (
+        <StatusPanel
+          memoryCount={data.memoryCount}
+          collectionCount={data.collectionCount}
+          recentlyUpdated={data.recentlyUpdated}
+        />
+      )}
+
+      <SectionHeader title="Quick capture" />
+      <QuickCapture />
+
+      {status === 'loading' && <DashboardSkeleton />}
+
+      {status === 'error' && <ErrorState onRetry={() => sync('retry')} />}
+
+      {isEmpty && (
         <EmptyState
           icon="core"
-          title="The core is quiet"
-          message="Capture your first thought and it will gather here."
-          actionLabel="Capture a memory"
-          onAction={() => router.push(routes.newMemory)}
+          title="Your core is empty"
+          message="Capture your first thought above. Notes, ideas, links and voice memos all gather here."
+          actionLabel="Write a note"
+          onAction={() => router.push(routes.newMemory('note'))}
         />
-      ) : (
+      )}
+
+      {ready && !isEmpty && (
         <>
-          <View style={styles.stats}>
-            <StatTile label="Memories" value={stats.total} />
-            <StatTile label="Links" value={stats.connections} highlight />
-            <StatTile label="Favorites" value={stats.favorites} />
-          </View>
+          <SectionHeader title="Continue exploring" />
+          <ContinueExploring memories={data.continueExploring} />
 
-          {rediscovery && <RediscoverCard memory={rediscovery} />}
+          <SectionHeader title="Rediscover" />
+          <RediscoverSection rediscovery={data.rediscovery} />
 
-          {pinned.length > 0 && (
-            <>
-              <SectionHeader title="Pinned" />
-              <MemoryList memories={pinned} />
-            </>
-          )}
-
-          <SectionHeader title="Recent" actionLabel="See all" onAction={() => router.navigate(routes.vault)} />
-          <MemoryList memories={recent} />
+          <SectionHeader title="Recent connections" />
+          <RecentConnections connections={data.connections} />
         </>
       )}
     </Screen>
   );
 }
-
-const styles = StyleSheet.create({
-  stats: { flexDirection: 'row', gap: spacing.xs },
-});

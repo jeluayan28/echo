@@ -24,7 +24,7 @@ export default function TabsLayout() {
           <TabBarButton label="Map" icon="map" />
         </TabTrigger>
         <TabTrigger name="capture" href="/capture" asChild>
-          <CaptureTabButton onPress={() => router.push(routes.newMemory)} />
+          <CaptureTabButton onPress={() => router.push(routes.newMemory())} />
         </TabTrigger>
         <TabTrigger name="search" href="/search" asChild>
           <TabBarButton label="Search" icon="search" />

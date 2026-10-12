@@ -1,12 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 
 import { ScreenHeader, SectionHeader } from '@/components/layout';
 import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Text, useToast } from '@/components/ui';
 import { memoryActions, useMemories, useMemory } from '@/data/hooks';
+import { LinkSheet } from '@/features/memory/LinkSheet';
 import { MemoryList } from '@/features/memory/MemoryList';
+import { VoicePlayer } from '@/features/memory/VoicePlayer';
 import { formatRelative } from '@/lib/format';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
@@ -21,6 +23,13 @@ export default function MemoryDetailScreen() {
   const memory = useMemory(id);
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linking, setLinking] = useState(false);
+
+  // Opening a memory feeds "Continue exploring" and resets its rediscovery idle time.
+  const exists = !!memory;
+  useEffect(() => {
+    if (exists) memoryActions.markOpened(id);
+  }, [exists, id]);
 
   if (!memory) {
     return (
@@ -66,6 +75,8 @@ export default function MemoryDetailScreen() {
         {formatRelative(memory.createdAt)}
       </Text>
 
+      {memory.audioUri && <VoicePlayer uri={memory.audioUri} durationMs={memory.audioDurationMs} />}
+
       {memory.url && (
         <View style={{ flexDirection: 'row' }}>
           <Button
@@ -87,12 +98,13 @@ export default function MemoryDetailScreen() {
         </View>
       )}
 
-      {linked.length > 0 && (
-        <>
-          <SectionHeader title="Linked memories" />
-          <MemoryList memories={linked} />
-        </>
-      )}
+      <SectionHeader title="Linked memories" />
+      {linked.length > 0 && <MemoryList memories={linked} />}
+      <View style={{ flexDirection: 'row' }}>
+        <Button label="Link a memory" icon="link" variant="secondary" onPress={() => setLinking(true)} />
+      </View>
+
+      <LinkSheet memory={memory} visible={linking} onClose={() => setLinking(false)} />
 
       <ConfirmDialog
         visible={confirmDelete}
@@ -101,11 +113,15 @@ export default function MemoryDetailScreen() {
         message="It will be removed along with its links. This can’t be undone."
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={() => {
+        onConfirm={async () => {
           setConfirmDelete(false);
-          memoryActions.remove(memory.id);
-          goBack();
-          toast.show('Memory deleted', 'success');
+          try {
+            await memoryActions.remove(memory.id);
+            goBack();
+            toast.show('Memory deleted', 'success');
+          } catch {
+            toast.show('Couldn’t delete. Please try again.', 'error');
+          }
         }}
       />
     </Screen>

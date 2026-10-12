@@ -55,6 +55,7 @@ export function Chip({ label, selected = false, icon, count, onPress, onRemove }
       accessibilityRole="button"
       accessibilityLabel={onRemove ? `Remove ${label}` : count != null ? `${label}, ${count}` : label}
       accessibilityState={{ selected }}
+      aria-selected={selected}
       hitSlop={{ top: 6, bottom: 6 }}
       pressedScale={0.95}
       style={[styles.base, selectedStyle]}

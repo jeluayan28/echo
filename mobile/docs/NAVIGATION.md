@@ -42,15 +42,42 @@ src/
   lib/            format helpers
 ```
 
-## Sample data vs. the future API
+## Data layer: repository boundary
 
-Screens only call hooks in `src/data/hooks.ts` (`useMemories`, `useMemory`, `memoryActions`, …).
-Today those are backed by `store.ts`, an in-memory store seeded from `sample-data.ts`; changes
-last until the app reloads. When the Laravel API exists, replace the store internals with `src/api`
-calls plus a query cache and delete `sample-data.ts`; screens should not change.
+```
+screens → hooks.ts (reads, memoryActions) → repository.ts (EchoRepository interface)
+                                               └─ sample-repository.ts → store.ts + sample-data.ts   ← temporary
+                                               └─ (later) api-repository.ts → Laravel
+```
+
+Screens only use `src/data/hooks.ts`. Writes return Promises (`create`, `update`, `remove`,
+`markOpened`, `link`, `unlink`, `dismissRediscovery`) so callers already handle async + failure.
+To connect the API: implement `EchoRepository`, change the one export in `repository.ts`, and delete
+`sample-*.ts` / `store.ts`. Sample data resets on reload.
+
+Dev/test hooks (only when `__DEV__`): `window.__ECHO_FAIL_FIRST_SYNC = n` before load makes the first
+`n` syncs fail; `__echoSample.failNextSync(n)` and `__echoSample.deleteAll()` from the console.
+
+## Memory Core dashboard (`(tabs)/index.tsx`)
+
+Top bar (ECHO mark + profile avatar → Settings) · greeting · status panel · Quick Capture ·
+Continue exploring · Rediscover · Recent connections. `useDashboard()` owns loading/refresh/error:
+first load shows skeletons (Quick Capture is always usable), a failed first load shows `ErrorState`
+with retry, a failed pull-to-refresh keeps cached data and shows a toast. Every count and list is
+derived from live data in `data/selectors.ts`.
+
+- **Status:** memory count, collection count, and the most recently *edited* memory.
+- **Quick Capture:** `routes.newMemory(type)` → `/memory/new?type=note|idea|link|voice`; the form preselects the type.
+  Voice uses `expo-audio` (microphone permission set in `app.json`; recordings saved to the document directory).
+- **Continue exploring:** most recent activity = latest of `lastOpenedAt` (set when a detail screen opens) and `updatedAt`.
+- **Rediscover — the rule (no AI):** a memory is eligible after 7+ days with no open or edit; the one idle
+  longest is shown (ties → more links); anything dismissed today is skipped. Opening or editing resets idle time,
+  so suggestions rotate. Favoriting/pinning does *not* count as touching. Actions: Open, favorite, dismiss
+  (dismissals last for the current day). The card states why it was chosen.
+- **Recent connections:** user-created links (made from a memory's "Link a memory" sheet), newest first, max 4.
 
 ## Intentionally inert (not fake)
 
 - Settings rows for Profile / Theme / Privacy / Notifications render as dimmed "Soon" rows, not buttons.
 - Login/Register validate input, then show a toast saying authentication connects in the next step.
-- Voice memos can't be created yet; collections can't be created/edited yet; the Map has no graph canvas yet.
+- Collections can't be created/edited yet; the Map has no graph canvas yet.

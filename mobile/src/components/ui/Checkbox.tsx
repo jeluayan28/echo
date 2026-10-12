@@ -20,6 +20,7 @@ export function Checkbox({ checked, onChange, label, disabled }: CheckboxProps) 
       accessibilityRole="checkbox"
       accessibilityLabel={label}
       accessibilityState={{ checked, disabled: !!disabled }}
+      aria-checked={checked}
       disabled={disabled}
       onPress={() => {
         if (process.env.EXPO_OS !== 'web') Haptics.selectionAsync();
