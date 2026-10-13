@@ -15,7 +15,7 @@ import {
   type MemoryFilter,
 } from './selectors';
 import { store } from './store';
-import type { Collection, Memory, Profile } from './types';
+import type { Collection, Link, Memory, Profile } from './types';
 
 function useStoreState() {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
@@ -58,6 +58,11 @@ export function useProfile(): Profile {
 export function useConnections() {
   const { memories, links } = useStoreState();
   return useMemo(() => connectionPairs(memories, links), [memories, links]);
+}
+
+/** Raw links (relationships between memories), for building the Neural Map graph. */
+export function useLinks(): Link[] {
+  return useStoreState().links;
 }
 
 /** Mutations — thin wrappers so screens never import the repository directly. */

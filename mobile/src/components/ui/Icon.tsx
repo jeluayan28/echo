@@ -42,6 +42,10 @@ const icons = {
   error: 'alert-circle',
   success: 'check-circle',
   info: 'info',
+  list: 'list',
+  recenter: 'crosshair',
+  zoomIn: 'plus',
+  zoomOut: 'minus',
 } as const satisfies Record<string, ComponentProps<typeof Feather>['name']>;
 
 export type IconName = keyof typeof icons;
