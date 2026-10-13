@@ -4,18 +4,19 @@
  */
 import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 
+import { suggest, type SuggestionKind } from '@/features/rediscovery/rules';
+
 import { repository } from './repository';
 import {
   connectionPairs,
   continueExploring,
   filterMemories,
-  pickRediscovery,
   recentlyUpdated,
   sortNewest,
   type MemoryFilter,
 } from './selectors';
 import { store } from './store';
-import type { Collection, Link, Memory, Profile } from './types';
+import type { Collection, Link, Memory, Profile, Reminder } from './types';
 
 function useStoreState() {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
@@ -65,6 +66,27 @@ export function useLinks(): Link[] {
   return useStoreState().links;
 }
 
+export function useReminder(memoryId: string | undefined): Reminder | undefined {
+  const { reminders } = useStoreState();
+  return memoryId ? reminders[memoryId] : undefined;
+}
+
+/**
+ * Rediscovery suggestions (see features/rediscovery/rules.ts). `contextId` enables the
+ * "connected to the current memory" rule. Recomputed when memories, reminders or the user's
+ * snooze/dismiss decisions change.
+ */
+export function useSuggestions(options: { contextId?: string; limit?: number; kinds?: SuggestionKind[] } = {}) {
+  const { memories, reminders, rediscovery } = useStoreState();
+  const { contextId, limit, kinds } = options;
+  const kindsKey = kinds?.join(',');
+  return useMemo(
+    () => suggest({ memories, reminders, state: rediscovery, contextId, limit, kinds }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `kindsKey` stands in for the `kinds` array identity
+    [memories, reminders, rediscovery, contextId, limit, kindsKey],
+  );
+}
+
 /** Mutations — thin wrappers so screens never import the repository directly. */
 export const memoryActions = {
   create: repository.createMemory.bind(repository),
@@ -78,6 +100,14 @@ export const memoryActions = {
   link: repository.linkMemories.bind(repository),
   unlink: repository.unlinkMemories.bind(repository),
   dismissRediscovery: repository.dismissRediscovery.bind(repository),
+  snoozeRediscovery: repository.snoozeRediscovery.bind(repository),
+};
+
+/** Reminder records. The OS notification itself is scheduled by features/reminders. */
+export const reminderRecords = {
+  get: (memoryId: string): Reminder | undefined => store.getState().reminders[memoryId],
+  save: repository.saveReminder.bind(repository),
+  remove: repository.removeReminder.bind(repository),
 };
 
 export const collectionActions = {
@@ -102,7 +132,7 @@ export function useDashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const inFlight = useRef(false);
 
-  const { memories, collections, links, dismissedRediscoveries, profile } = useStoreState();
+  const { memories, collections, links, rediscovery, reminders, profile } = useStoreState();
 
   /** Resolves true on success. A failed *refresh* keeps showing the cached data. */
   const sync = useCallback(async (kind: 'initial' | 'retry' | 'refresh'): Promise<boolean> => {
@@ -127,18 +157,18 @@ export function useDashboard() {
   }, []);
 
   const data = useMemo(() => {
-    const rediscovery = pickRediscovery(memories, dismissedRediscoveries);
+    const { suggestions, suppressedCount } = suggest({ memories, reminders, state: rediscovery, limit: 1 });
     return {
       profile,
       memoryCount: memories.length,
       collectionCount: collections.length,
       recentlyUpdated: recentlyUpdated(memories),
       continueExploring: continueExploring(memories, 4),
-      rediscovery,
+      rediscovery: { pick: suggestions[0], allDismissed: suppressedCount > 0 },
       connections: connectionPairs(memories, links).slice(0, 4),
       totalConnections: links.length,
     };
-  }, [memories, collections, links, dismissedRediscoveries, profile]);
+  }, [memories, collections, links, rediscovery, reminders, profile]);
 
   return { status, refreshing, data, sync };
 }

@@ -4,7 +4,6 @@ import {
   filterMemories,
   lastActivityAt,
   lastActivityKind,
-  pickRediscovery,
   recentlyUpdated,
   tagCounts,
 } from '../selectors';
@@ -94,42 +93,5 @@ describe('dashboard selectors', () => {
     ];
     const pairs = connectionPairs([mem('a'), mem('b'), mem('c')], links);
     expect(pairs.map((p) => p.link.id)).toEqual(['l2', 'l1']);
-  });
-});
-
-describe('pickRediscovery (rule: idle ≥ 7 days, longest idle first, not dismissed today)', () => {
-  it('ignores memories touched within the last 7 days', () => {
-    const list = [mem('fresh', { updatedAt: ago(6) }), mem('opened', { updatedAt: ago(40), lastOpenedAt: ago(2) })];
-    expect(pickRediscovery(list, {}, NOW)).toEqual({ pick: undefined, allDismissed: false });
-  });
-
-  it('picks the memory idle the longest and reports its idle days', () => {
-    const list = [mem('a', { updatedAt: ago(10) }), mem('b', { updatedAt: ago(45) }), mem('c', { updatedAt: ago(20) })];
-    const { pick } = pickRediscovery(list, {}, NOW);
-    expect(pick?.memory.id).toBe('b');
-    expect(pick?.idleDays).toBe(45);
-  });
-
-  it('counts opening as activity (resets idle time)', () => {
-    const list = [mem('a', { updatedAt: ago(45), lastOpenedAt: ago(8) }), mem('b', { updatedAt: ago(20) })];
-    expect(pickRediscovery(list, {}, NOW).pick?.memory.id).toBe('b');
-  });
-
-  it('breaks ties by number of links', () => {
-    const list = [mem('few', { updatedAt: ago(15), linkedIds: ['x'] }), mem('many', { updatedAt: ago(15), linkedIds: ['x', 'y', 'z'] })];
-    expect(pickRediscovery(list, {}, NOW).pick?.memory.id).toBe('many');
-  });
-
-  it('skips memories dismissed today but not those dismissed on another day', () => {
-    const list = [mem('a', { updatedAt: ago(45) }), mem('b', { updatedAt: ago(20) })];
-    const today = '2026-06-15';
-    expect(pickRediscovery(list, { a: today }, NOW).pick?.memory.id).toBe('b');
-    expect(pickRediscovery(list, { a: '2026-06-14' }, NOW).pick?.memory.id).toBe('a');
-  });
-
-  it('reports allDismissed only when candidates exist but all were dismissed', () => {
-    const list = [mem('a', { updatedAt: ago(45) })];
-    expect(pickRediscovery(list, { a: '2026-06-15' }, NOW)).toEqual({ pick: undefined, allDismissed: true });
-    expect(pickRediscovery([], {}, NOW)).toEqual({ pick: undefined, allDismissed: false });
   });
 });

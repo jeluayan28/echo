@@ -1,5 +1,3 @@
-import { dayKey } from '@/lib/format';
-
 import type { Link, Memory, MemoryType } from './types';
 
 export type MemoryFilter = {
@@ -12,7 +10,6 @@ export type MemoryFilter = {
   collectionId?: string;
 };
 
-const DAY_MS = 86_400_000;
 const byNewest = (a: Memory, b: Memory) => b.createdAt.localeCompare(a.createdAt);
 
 export function sortNewest(memories: Memory[]): Memory[] {
@@ -79,35 +76,4 @@ export function continueExploring(memories: Memory[], limit = 4): Memory[] {
 /** The memory the user changed most recently (content edits only, not views). */
 export function recentlyUpdated(memories: Memory[]): Memory | undefined {
   return [...memories].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0];
-}
-
-export const REDISCOVERY_MIN_IDLE_DAYS = 7;
-
-export type Rediscovery = { memory: Memory; idleDays: number };
-
-/**
- * REDISCOVERY RULE (deterministic — no AI involved):
- *   1. Eligible: memories not opened or edited for at least 7 days.
- *   2. Excluded: any the user dismissed today.
- *   3. Pick the one idle the longest; ties go to the memory with more links.
- * Opening or editing a memory resets its idle time, so suggestions rotate naturally.
- */
-export function pickRediscovery(
-  memories: Memory[],
-  dismissed: Record<string, string>,
-  now: Date = new Date(),
-): { pick?: Rediscovery; allDismissed: boolean } {
-  const today = dayKey(now);
-  const eligible = memories
-    .map((memory) => ({
-      memory,
-      idleDays: Math.floor((now.getTime() - new Date(lastActivityAt(memory)).getTime()) / DAY_MS),
-    }))
-    .filter((c) => c.idleDays >= REDISCOVERY_MIN_IDLE_DAYS);
-
-  const available = eligible.filter((c) => dismissed[c.memory.id] !== today);
-  available.sort(
-    (a, b) => b.idleDays - a.idleDays || b.memory.linkedIds.length - a.memory.linkedIds.length,
-  );
-  return { pick: available[0], allDismissed: eligible.length > 0 && available.length === 0 };
 }

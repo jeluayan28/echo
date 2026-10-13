@@ -60,6 +60,28 @@ export type Link = {
   createdAt: string; // ISO 8601
 };
 
+/**
+ * A reminder the user set on one memory (at most one per memory).
+ * `delivery` records what ECHO actually arranged: an OS notification, or only an in-app cue
+ * (notifications denied / unsupported on this platform). Neither is a guaranteed delivery.
+ */
+export type Reminder = {
+  memoryId: string;
+  fireAt: string; // ISO 8601
+  /** Id of the scheduled OS notification, when one was scheduled. */
+  notificationId?: string;
+  delivery: 'notification' | 'in-app';
+  createdAt: string; // ISO 8601
+};
+
+/** What the user told Rediscovery about one memory. Drives snooze / dismissal rules. */
+export type RediscoveryState = {
+  /** Last time the user dismissed a suggestion for this memory. */
+  dismissedAt?: string; // ISO 8601
+  /** No suggestions for this memory before this moment. */
+  snoozedUntil?: string; // ISO 8601
+};
+
 export type Profile = {
   name: string;
   email?: string;

@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { ToastProvider } from '@/components/ui';
+import { installNotificationHandling } from '@/features/reminders/notifications';
 import { colors } from '@/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -42,6 +43,9 @@ export default function RootLayout() {
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
+
+  // Show reminders that arrive while the app is open and open the memory when one is tapped.
+  useEffect(() => (ready ? installNotificationHandling() : undefined), [ready]);
 
   if (!ready) return null;
 

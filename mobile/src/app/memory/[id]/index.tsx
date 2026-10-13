@@ -5,8 +5,10 @@ import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader, SectionHeader } from '@/components/layout';
 import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Text, useToast } from '@/components/ui';
-import { memoryActions, useCollection, useMemories, useMemory } from '@/data/hooks';
+import { memoryActions, useCollection, useMemories, useMemory, useSuggestions } from '@/data/hooks';
 import { deleteMemoryWithUndo } from '@/features/memory/delete-memory';
+import { SuggestionCard } from '@/features/rediscovery/SuggestionCard';
+import { ReminderSection } from '@/features/reminders/ReminderSection';
 import { LinkSheet } from '@/features/memory/LinkSheet';
 import { MemoryList } from '@/features/memory/MemoryList';
 import { VoicePlayer } from '@/features/memory/VoicePlayer';
@@ -35,6 +37,8 @@ export default function MemoryDetailScreen() {
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [linking, setLinking] = useState(false);
+  // Rule: linked to THIS memory and not opened recently (see features/rediscovery/rules.ts).
+  const related = useSuggestions({ contextId: id, kinds: ['connected'], limit: 2 }).suggestions;
 
   // Opening a memory feeds "Continue exploring" and resets its rediscovery idle time.
   const exists = !!memory;
@@ -129,11 +133,22 @@ export default function MemoryDetailScreen() {
         </View>
       )}
 
+      <ReminderSection memory={memory} />
+
       <SectionHeader title="Linked memories" />
       {linked.length > 0 && <MemoryList memories={linked} />}
       <View style={styles.block}>
         <Button label="Link a memory" icon="link" variant="secondary" onPress={() => setLinking(true)} />
       </View>
+
+      {related.length > 0 ? (
+        <>
+          <SectionHeader title="Worth revisiting" />
+          {related.map((s) => (
+            <SuggestionCard key={s.memory.id} suggestion={s} compact />
+          ))}
+        </>
+      ) : null}
 
       <LinkSheet memory={memory} visible={linking} onClose={() => setLinking(false)} />
 

@@ -42,6 +42,7 @@ const icons = {
   error: 'alert-circle',
   success: 'check-circle',
   info: 'info',
+  clock: 'clock',
   list: 'list',
   recenter: 'crosshair',
   zoomIn: 'plus',

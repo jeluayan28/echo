@@ -97,6 +97,15 @@ export const sampleRepository: EchoRepository = {
   async dismissRediscovery(id) {
     store.dismissRediscovery(id);
   },
+  async snoozeRediscovery(id, until) {
+    store.snoozeRediscovery(id, until);
+  },
+  async saveReminder(reminder) {
+    store.setReminder(reminder);
+  },
+  async removeReminder(memoryId) {
+    store.clearReminder(memoryId);
+  },
 
   async createCollection(input) {
     return store.createCollection(input);

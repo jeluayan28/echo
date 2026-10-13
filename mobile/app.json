@@ -40,7 +40,13 @@
           "recordAudioAndroid": true
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "color": "#9B7BFF"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

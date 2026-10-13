@@ -6,7 +6,15 @@
  * change the single export below, and delete `sample-*.ts` / `store.ts`.
  */
 import { sampleRepository } from './sample-repository';
-import type { Attachment, Collection, CollectionInput, LocalFile, Memory, MemoryInput } from './types';
+import type {
+  Attachment,
+  Collection,
+  CollectionInput,
+  LocalFile,
+  Memory,
+  MemoryInput,
+  Reminder,
+} from './types';
 
 export type UploadOptions = {
   /** Called with 0…1 while bytes are being sent. */
@@ -41,8 +49,14 @@ export interface EchoRepository {
   markOpened(id: string): Promise<void>;
   linkMemories(fromId: string, toId: string): Promise<void>;
   unlinkMemories(aId: string, bId: string): Promise<void>;
-  /** Hides a rediscovery suggestion for the rest of today. */
+  /** The user said "not for me" to a suggestion; Rediscovery honors a cooldown (see rediscovery/rules.ts). */
   dismissRediscovery(id: string): Promise<void>;
+  /** Hides suggestions for this memory until `until` (ISO 8601). */
+  snoozeRediscovery(id: string, until: string): Promise<void>;
+
+  /** Records a reminder (the notification itself is scheduled on the device by features/reminders). */
+  saveReminder(reminder: Reminder): Promise<void>;
+  removeReminder(memoryId: string): Promise<void>;
 
   createCollection(input: CollectionInput): Promise<Collection>;
   updateCollection(id: string, input: CollectionInput): Promise<void>;

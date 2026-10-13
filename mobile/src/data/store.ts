@@ -6,8 +6,6 @@
  *
  * PERSISTENCE: none. Everything here is lost when the app process restarts.
  */
-import { dayKey } from '@/lib/format';
-
 import { sampleCollections, sampleLinks, sampleMemories, sampleProfile, withLinkedIds } from './sample-data';
 import type {
   Collection,
@@ -16,6 +14,8 @@ import type {
   Memory,
   MemoryInput,
   Profile,
+  RediscoveryState,
+  Reminder,
   TrashedMemory,
 } from './types';
 
@@ -26,8 +26,10 @@ export type State = {
   links: Link[];
   /** Recently deleted memories, restorable until purged. */
   trash: TrashedMemory[];
-  /** memoryId → local calendar day ("YYYY-MM-DD") on which the user dismissed its rediscovery. */
-  dismissedRediscoveries: Record<string, string>;
+  /** memoryId → the user's dismiss / snooze decisions for Rediscovery. */
+  rediscovery: Record<string, RediscoveryState>;
+  /** memoryId → its reminder. */
+  reminders: Record<string, Reminder>;
 };
 
 const initialState = (): State => ({
@@ -36,7 +38,8 @@ const initialState = (): State => ({
   collections: sampleCollections,
   links: sampleLinks,
   trash: [],
-  dismissedRediscoveries: {},
+  rediscovery: {},
+  reminders: {},
 });
 
 let state: State = initialState();
@@ -102,8 +105,13 @@ export const store = {
 
   markOpened(id: string) {
     const lastOpenedAt = new Date().toISOString();
+    // Opening a memory whose reminder time has passed fulfils that reminder.
+    const reminder = state.reminders[id];
+    const due = !!reminder && reminder.fireAt <= lastOpenedAt;
+    const { [id]: _done, ...rest } = state.reminders;
     setState({
       ...state,
+      reminders: due ? rest : state.reminders,
       memories: state.memories.map((m) => (m.id === id ? { ...m, lastOpenedAt } : m)),
     });
   },
@@ -114,11 +122,13 @@ export const store = {
     if (!memory) return;
     const removedLinks = state.links.filter((l) => l.fromId === id || l.toId === id);
     const links = state.links.filter((l) => l.fromId !== id && l.toId !== id);
-    const { [id]: _dismissed, ...dismissed } = state.dismissedRediscoveries;
+    const { [id]: _state, ...rediscovery } = state.rediscovery;
+    const { [id]: _reminder, ...reminders } = state.reminders;
     setState({
       ...state,
       links,
-      dismissedRediscoveries: dismissed,
+      rediscovery,
+      reminders,
       memories: relink(
         state.memories.filter((m) => m.id !== id),
         links,
@@ -174,11 +184,24 @@ export const store = {
     setState({ ...state, links, memories: relink(state.memories, links) });
   },
 
-  dismissRediscovery(id: string) {
-    setState({
-      ...state,
-      dismissedRediscoveries: { ...state.dismissedRediscoveries, [id]: dayKey() },
-    });
+  dismissRediscovery(id: string, at: string = new Date().toISOString()) {
+    const current = state.rediscovery[id] ?? {};
+    setState({ ...state, rediscovery: { ...state.rediscovery, [id]: { ...current, dismissedAt: at } } });
+  },
+
+  snoozeRediscovery(id: string, until: string) {
+    const current = state.rediscovery[id] ?? {};
+    setState({ ...state, rediscovery: { ...state.rediscovery, [id]: { ...current, snoozedUntil: until } } });
+  },
+
+  // ── reminders ─────────────────────────────────────────────────────────────
+  setReminder(reminder: Reminder) {
+    setState({ ...state, reminders: { ...state.reminders, [reminder.memoryId]: reminder } });
+  },
+
+  clearReminder(memoryId: string) {
+    const { [memoryId]: _removed, ...reminders } = state.reminders;
+    setState({ ...state, reminders });
   },
 
   // ── collections ───────────────────────────────────────────────────────────

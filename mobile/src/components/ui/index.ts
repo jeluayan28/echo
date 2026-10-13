@@ -3,6 +3,7 @@ export { Checkbox, type CheckboxProps } from './Checkbox';
 export { Chip, type ChipProps } from './Chip';
 export { CollectionCard, type CollectionCardProps } from './CollectionCard';
 export { ConfirmDialog, type ConfirmDialogProps } from './ConfirmDialog';
+export { HighlightedText, type HighlightedTextProps } from './HighlightedText';
 export { Icon, type IconName, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { MemoryCard, type MemoryCardProps, type MemoryType } from './MemoryCard';
