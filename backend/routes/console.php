@@ -1,8 +1,10 @@
 <?php
 
-use Illuminate\Foundation\Inspiring;
-use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\Schedule;
 
-Artisan::command('inspire', function () {
-    $this->comment(Inspiring::quote());
-})->purpose('Display an inspiring quote');
+// Housekeeping. Requires the scheduler: `php artisan schedule:work` locally, or a cron entry running
+// `php artisan schedule:run` every minute in production.
+Schedule::command('echo:prune')->dailyAt('03:15')->onOneServer()->withoutOverlapping();
+
+// Keeps the personal-access-token table from growing forever.
+Schedule::command('sanctum:prune-expired --hours=24')->daily();

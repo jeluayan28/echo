@@ -1,66 +1,109 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# ECHO backend
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Laravel 12 · PHP 8.2+ · PostgreSQL 15+ · Laravel Sanctum (bearer tokens for the mobile app).
 
-## About Laravel
+REST API under **`/api/v1`**. Every user-owned resource is private to its owner; another user's id answers `404`,
+exactly like an id that doesn't exist.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+## Setup on Windows (PowerShell)
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Prerequisites: PHP 8.2+ with `pdo_pgsql`, Composer, PostgreSQL 15 or newer (`psql` on PATH).
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+```powershell
+cd C:\Users\Jelli\Desktop\echo\backend
 
-## Learning Laravel
+composer install
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+php artisan key:generate
+```
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+Edit `.env` and set the database credentials (the file is git-ignored — never commit it):
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+```
+DB_USERNAME=postgres          # or a dedicated role
+DB_PASSWORD=<your PostgreSQL password>
+```
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Create the development database and the **test** database (the tests wipe `echo_test`; they refuse to run against
+any database whose name does not end in `_test`):
 
-## Laravel Sponsors
+```powershell
+createdb -h 127.0.0.1 -U postgres echo
+createdb -h 127.0.0.1 -U postgres echo_test
+```
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+Create the tables and (optionally) demo data, then start the API:
 
-### Premium Partners
+```powershell
+php artisan migrate
+$env:DEMO_USER_PASSWORD = "choose-a-local-password"; php artisan db:seed   # demo@echo.test (omit the variable to get a generated password)
+php artisan serve                                                          # http://127.0.0.1:8000
+```
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[WebReinvent](https://webreinvent.com/)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Jump24](https://jump24.co.uk)**
-- **[Redberry](https://redberry.international/laravel/)**
-- **[Active Logic](https://activelogic.com)**
-- **[byte5](https://byte5.de)**
-- **[OP.GG](https://op.gg)**
+Smoke test (PowerShell):
 
-## Contributing
+```powershell
+$login = Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/auth/login -ContentType application/json `
+  -Body (@{ email = "demo@echo.test"; password = "choose-a-local-password" } | ConvertTo-Json)
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/search?q=notes -Headers @{ Authorization = "Bearer $($login.data.token)"; Accept = "application/json" }
+```
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Verify
 
-## Code of Conduct
+```powershell
+php artisan test                       # 175 tests, PostgreSQL required (database echo_test)
+php artisan migrate:status
+php artisan route:list --path=api
+vendor\bin\pint --test                 # code style
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+Housekeeping (`php artisan schedule:work` locally, or a cron entry running `php artisan schedule:run` every minute in production):
+`echo:prune` deletes uploads never attached to a memory (after 24 h) and memories that have been in the trash for 30 days,
+including their files.
 
-## Security Vulnerabilities
+## Endpoints
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+| Area | Routes |
+|---|---|
+| Auth | `POST auth/register` · `POST auth/login` · `POST auth/logout` |
+| Account | `GET/PATCH/DELETE me` · `GET/PATCH me/preferences` |
+| Memories | `GET/POST memories` · `GET/PATCH/DELETE memories/{id}` · `POST memories/{id}/open` · `GET memories/trashed` · `POST memories/{id}/restore` · `DELETE memories/{id}/force` |
+| Collections | `GET/POST collections` · `GET/PATCH/DELETE collections/{id}` |
+| Tags | `GET/POST tags` · `PATCH/DELETE tags/{id}` |
+| Relationships | `GET links` (whole graph) · `GET/POST memories/{id}/links` · `DELETE memories/{id}/links/{otherId}` |
+| Search | `GET search?q=…` (+ `type`, `collection_id`, `tag`, `favorite`, `pinned`) |
+| Reminders | `GET reminders` · `GET/PUT/DELETE memories/{id}/reminder` · `POST reminders/{id}/complete` |
+| Attachments | `POST attachments` · `GET/DELETE attachments/{id}` · `GET attachments/{id}/file` · `GET/POST memories/{id}/attachment` |
 
-## License
+Conventions: JSON only · `data` / `links` / `meta` envelope with `?page=&per_page=` (max 100; the graph endpoint 500) ·
+`201` create, `204` delete, `401` unauthenticated, `404` missing **or not yours**, `409` duplicate link, `422` validation
+(`{message, errors}`), `429` rate limited.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+## Design notes
+
+- **Tenant isolation, twice.** Controllers only query through the authenticated user and policies check ownership
+  (`404` for non-owners). Below that, the database refuses cross-user references: every child row carries `user_id` and
+  points at its parent through a *composite* foreign key `(user_id, parent_id)`, so even a buggy query cannot put Alice's
+  memory in Bob's collection, tag, or link.
+- **Relationships** are undirected, stored once with the smaller id first: `CHECK (from < to)` forbids self-links and
+  reversed duplicates, `UNIQUE (from, to)` forbids repeats. The API answers `422` (self / foreign / missing target) or `409` (exists).
+- **Search**: a stored generated `tsvector` (`title` weight A, `body` weight B, `simple` config) with a GIN index; every
+  word must match and the last word matches as a prefix; tags match too. Input is reduced to letters/digits, so no
+  query syntax can be injected. List and search responses return a 200-char `excerpt`, never the full body.
+- **Cascades**: deleting a user deletes their data; deleting a collection keeps its memories; soft-deleting a memory keeps
+  its links/tags/reminder so *Undo* restores everything; permanently deleting removes them and the stored file.
+- **Files**: bytes go to the disk named by `ECHO_ATTACHMENT_DISK` (private; S3-compatible in production), PostgreSQL stores
+  metadata only. Type is sniffed from the file content, size is capped, names are generated server-side, `path`/`disk`
+  are never returned. Playback uses a 10-minute signed URL issued only to the owner.
+- **Auth**: Sanctum bearer tokens (hashed at rest, 30-day expiry, per-device, logout revokes one device, a password change
+  revokes the others). Login is rate limited per account+IP; passwords are bcrypt-hashed; email/password changes and
+  account deletion require the current password.
+- **N+1 is a test failure**: outside production, lazy loading throws, and tests assert that query counts don't grow with row counts.
+
+## Limits and open items
+
+- Reminders are stored here; the notification itself is scheduled on the device (best-effort, no delivery guarantee).
+  The server does not push notifications yet.
+- The mobile app still uses its in-memory sample repository; switching it to this API is a separate step.
+- Production needs: `APP_DEBUG=false`, `APP_ENV=production`, TLS, a least-privilege database role,
+  `CORS_ALLOWED_ORIGINS` (if a web client is used), `TRUSTED_PROXIES` behind a load balancer, an S3 disk for files, and a scheduler.
