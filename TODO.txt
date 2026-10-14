@@ -60,5 +60,9 @@ Done: failure-mode tests (offline / 500 / 429 / 401 / deleted records / duplicat
     the register -> create -> edit -> search -> sign-out run still needs a clean result and a look at the screenshots.
     Needs: throwaway Postgres on port 54329, API on :8000, web export served on :8081.
     After changing EXPO_PUBLIC_* values run "npx expo export --clear" (Metro caches the old values).
+[ ] FIRST: the run's note body ("Written by the UI test.") never appeared on the detail screen, and edit/favorite/search/
+    sign-back-in failed after it. Check whether the body is saved (look at ui-fail-create-a-note*.png, query the API)
+    or whether the script typed into the wrong field. Everything else in that run passed (register, empty state, greeting,
+    triple-click Save = 1 memory, collection, map, settings, sign-out, redirect).
 [ ] Fix whatever that run finds, then re-run the full QA and write the report.
 Known limits: a session that expires while a form is open loses that unsaved draft.
