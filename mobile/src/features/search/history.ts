@@ -1,7 +1,7 @@
 /**
  * Recent searches: a small, device-local list (most recent first, no duplicates, capped).
  * A search is recorded when the user commits to it — pressing search on the keyboard or opening a
- * result — never on each keystroke. Like the rest of the sample data layer it is NOT persisted
+ * result — never on each keystroke. It is NOT persisted
  * across app restarts yet.
  */
 import { useSyncExternalStore } from 'react';

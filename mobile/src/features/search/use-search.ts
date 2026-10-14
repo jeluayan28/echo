@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Collection, Memory } from '@/data/types';
 
 import { apiSearchProvider } from './api-provider';
-import { lexicalProvider, runSearch, type SearchHit, type SearchProvider, type SearchRequest } from './engine';
+import { runSearch, type SearchHit, type SearchProvider, type SearchRequest } from './engine';
 
 export type SearchStatus = 'loading' | 'ready' | 'error';
 

@@ -6,8 +6,7 @@
  * It runs the app's real code (session, repository, services, search provider, graph builder) — only `fetch`
  * is the real network. Every account is created fresh, so the run needs an empty-enough database, not a clean one.
  */
-import { getAuthToken } from '@/api/client';
-import { ApiError } from '@/api/client';
+import { ApiError, getAuthToken } from '@/api/client';
 import { clearSession, loadSession, saveSession } from '@/auth/secure-storage';
 import { restoreSession, session, signIn, signOut, signUp } from '@/auth/session';
 import { repository } from '@/data/repository';
@@ -20,13 +19,15 @@ import { saveMemory } from '@/features/memory/save-memory';
 
 // jest-expo replaces `fetch` with a native stub; this talks to the real server over Node's http module instead.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const nodeHttp = require('node:http') as typeof import('node:http');
+const nodeHttp = require('node:http') as {
+  request: (url: string, options: object, cb: (res: any) => void) => any;
+};
 function realFetch(url: string, init: RequestInit = {}): Promise<Response> {
   return new Promise((resolve, reject) => {
-    const req = nodeHttp.request(url, { method: init.method ?? 'GET', headers: init.headers as Record<string, string> }, (res) => {
+    const req = nodeHttp.request(url, { method: init.method ?? 'GET', headers: init.headers as Record<string, string> }, (res: any) => {
       let text = '';
       res.setEncoding('utf8');
-      res.on('data', (c) => (text += c));
+      res.on('data', (c: string) => (text += c));
       res.on('end', () =>
         resolve({
           ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300,
