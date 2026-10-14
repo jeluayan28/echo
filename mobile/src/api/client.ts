@@ -134,9 +134,19 @@ async function once(method: Method, path: string, options: RequestOptions): Prom
     if (token) headers.Authorization = `Bearer ${token}`;
   }
 
+  // Built outside the try: a bad API URL is a ConfigError the user/developer must see, not a "no connection".
+  let url: string;
+  try {
+    url = buildUrl(path, query);
+  } catch (e) {
+    clearTimeout(timer);
+    signal?.removeEventListener('abort', onAbort);
+    throw e;
+  }
+
   let response: Response;
   try {
-    response = await fetch(buildUrl(path, query), {
+    response = await fetch(url, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
