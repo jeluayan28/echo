@@ -5,9 +5,8 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { CollectionPicker, MemoryTypeSelector, TagInput } from '@/components/forms';
 import { ScreenHeader } from '@/components/layout';
 import { Button, ConfirmDialog, Screen, Switch, Text, TextField, useToast } from '@/components/ui';
-import { SaveError } from '@/data/errors';
-import { useCollections, useMemories } from '@/data/hooks';
-import { tagCounts } from '@/data/selectors';
+import { SaveError, describeError } from '@/data/errors';
+import { useCollections, useTags } from '@/data/hooks';
 import type { Memory, MemoryType } from '@/data/types';
 import { LIMITS, hasErrors } from '@/data/validation';
 import { deleteLocalFile } from '@/lib/files';
@@ -40,7 +39,12 @@ function describeFailure(e: unknown): SaveProblem {
           : 'Couldn’t upload the recording. It’s still here — try again.',
     };
   }
-  return { phase: 'save', message: 'Couldn’t save your memory. Everything you entered is still here — try again.' };
+  // `cause` is the underlying ApiError/NetworkError: say what really happened (offline, validation, rate limit).
+  const reason = describeError((e as { cause?: unknown })?.cause, '');
+  return {
+    phase: 'save',
+    message: `${reason ? `${reason} ` : 'Couldn’t save your memory. '}Nothing was saved — everything you entered is still here, so you can try again.`,
+  };
 }
 
 /**
@@ -53,8 +57,8 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
   const navigation = useNavigation();
   const form = useMemoryForm({ initial: memory, initialType, initialCollectionId });
   const collections = useCollections();
-  const memories = useMemories();
-  const tagSuggestions = useMemo(() => tagCounts(memories).map((t) => t.tag), [memories]);
+  const tags = useTags();
+  const tagSuggestions = useMemo(() => tags.map((t) => t.tag), [tags]);
 
   const [saving, setSaving] = useState<'idle' | 'uploading' | 'saving'>('idle');
   const [progress, setProgress] = useState(0);

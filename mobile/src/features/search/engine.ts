@@ -40,6 +40,8 @@ export type SearchContext = { collections: Collection[] };
 
 export interface SearchProvider {
   id: string;
+  /** True when the provider only reads the candidates it is handed, so a cache change can change its answer. */
+  local?: boolean;
   search(request: SearchRequest, candidates: Memory[], context: SearchContext): SearchHit[] | Promise<SearchHit[]>;
 }
 
@@ -159,6 +161,7 @@ export function scoreMemory(memory: Memory, terms: string[]): number {
 
 export const lexicalProvider: SearchProvider = {
   id: 'lexical',
+  local: true,
   search(request, candidates) {
     const terms = tokenize(request.query);
     if (terms.length === 0) return candidates.map((memory) => ({ memory, score: 0 }));

@@ -1,5 +1,6 @@
 import type { ToastApi } from '@/components/ui';
 import { memoryActions, reminderRecords } from '@/data/hooks';
+import { describeError } from '@/data/errors';
 import { expoNotificationsPort } from '@/features/reminders/notifications';
 
 /** How long the user can undo a delete. After this the memory (and its audio file) is purged. */
@@ -13,7 +14,8 @@ export const UNDO_WINDOW_MS = 6000;
  * Throws if the delete itself fails (nothing was removed).
  */
 export async function deleteMemoryWithUndo(id: string, toast: ToastApi): Promise<void> {
-  // The store drops the memory's reminder record with it; keep it so Undo can bring it back.
+  // The server keeps the reminder with the trashed memory, so Undo restores it too; we only need the
+  // notification id to cancel the device alarm once the delete is final.
   const reminder = reminderRecords.get(id);
   await memoryActions.remove(id);
 
@@ -32,10 +34,9 @@ export async function deleteMemoryWithUndo(id: string, toast: ToastApi): Promise
         clearTimeout(purgeTimer);
         try {
           await memoryActions.restore(id);
-          if (reminder) await reminderRecords.save(reminder);
           toast.show('Memory restored', 'success');
-        } catch {
-          toast.show('Couldn’t restore this memory.', 'error');
+        } catch (e) {
+          toast.show(describeError(e, 'Couldn’t restore this memory.'), 'error');
         }
       },
     },

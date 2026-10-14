@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { View } from 'react-native';
 
+import { ApiError } from '@/api/client';
 import { Button, Sheet, TextField, useToast } from '@/components/ui';
 import { collectionActions } from '@/data/hooks';
+import { describeError } from '@/data/errors';
 import type { Collection } from '@/data/types';
 import { LIMITS, hasErrors, validateCollection, type CollectionErrors } from '@/data/validation';
 import { spacing } from '@/theme';
@@ -53,8 +55,10 @@ function CollectionForm({ collection, onClose, onSaved }: Omit<CollectionSheetPr
         onSaved?.(created.id);
       }
       onClose();
-    } catch {
-      toast.show('Couldn’t save the collection. Please try again.', 'error');
+    } catch (e) {
+      const field = e instanceof ApiError ? e.fieldErrors : {};
+      if (field.name || field.description) setErrors({ name: field.name, description: field.description });
+      else toast.show(describeError(e, 'Couldn’t save the collection. Please try again.'), 'error');
     } finally {
       setSaving(false);
     }

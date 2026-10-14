@@ -1,9 +1,10 @@
-import { router } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback } from 'react';
 
 import { SectionHeader } from '@/components/layout';
 import { EmptyState, ErrorState, Screen, useToast } from '@/components/ui';
 import { useDashboard } from '@/data/hooks';
+import { refreshIfStale } from '@/data/sync';
 import { ContinueExploring } from '@/features/core/ContinueExploring';
 import { DashboardSkeleton, StatusSkeleton } from '@/features/core/DashboardSkeleton';
 import { DashboardTopBar, Greeting } from '@/features/core/DashboardHeader';
@@ -22,11 +23,8 @@ export default function MemoryCoreScreen() {
   const toast = useToast();
   const { status, refreshing, data, sync } = useDashboard();
 
-  // Load once on mount, only when nothing has been fetched yet this session.
-  const needsInitialLoad = useRef(status === 'loading');
-  useEffect(() => {
-    if (needsInitialLoad.current) void sync('initial');
-  }, [sync]);
+  // The session starts the first sync on sign-in; this screen only retries and refreshes.
+  useFocusEffect(useCallback(() => refreshIfStale(), []));
 
   const onRefresh = async () => {
     const ok = await sync('refresh');

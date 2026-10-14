@@ -11,6 +11,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { restoreSession, useSession } from '@/auth/session';
 import { ToastProvider } from '@/components/ui';
 import { installNotificationHandling } from '@/features/reminders/notifications';
 import { colors } from '@/theme';
@@ -38,14 +39,21 @@ export default function RootLayout() {
     Inter_600SemiBold,
     Inter_700Bold,
   });
-  const ready = fontsLoaded || !!fontError; // fall back to system font rather than blocking forever
+  const { status } = useSession();
+  const signedIn = status === 'signedIn';
+  // Wait for fonts AND for the stored session to be read, so the first frame is the right screen.
+  const ready = (fontsLoaded || !!fontError) && status !== 'restoring';
+
+  useEffect(() => {
+    void restoreSession();
+  }, []);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync();
   }, [ready]);
 
   // Show reminders that arrive while the app is open and open the memory when one is tapped.
-  useEffect(() => (ready ? installNotificationHandling() : undefined), [ready]);
+  useEffect(() => (ready && signedIn ? installNotificationHandling() : undefined), [ready, signedIn]);
 
   if (!ready) return null;
 
@@ -60,12 +68,24 @@ export default function RootLayout() {
               contentStyle: { backgroundColor: colors.void },
             }}
           >
-            {/* Capture + edit are modals over whatever screen opened them. */}
-            <Stack.Screen name="memory/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-            <Stack.Screen
-              name="memory/[id]/edit"
-              options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
-            />
+            {/* Everything except the auth screens needs a session; signing out leaves them unreachable. */}
+            <Stack.Protected guard={signedIn}>
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="memory/[id]/index" />
+              <Stack.Screen name="collection/[id]" />
+              <Stack.Screen name="search-results" />
+              <Stack.Screen name="settings" />
+              {/* Capture + edit are modals over whatever screen opened them. */}
+              <Stack.Screen name="memory/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen
+                name="memory/[id]/edit"
+                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+              />
+            </Stack.Protected>
+            <Stack.Protected guard={!signedIn}>
+              <Stack.Screen name="(auth)/login" />
+              <Stack.Screen name="(auth)/register" />
+            </Stack.Protected>
           </Stack>
         </ToastProvider>
       </ThemeProvider>

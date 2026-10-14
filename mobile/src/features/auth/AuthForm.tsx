@@ -2,7 +2,10 @@ import { router } from 'expo-router';
 import { useRef, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
-import { Button, Text, TextField, useToast } from '@/components/ui';
+import { clearNotice, signIn, signUp, useSession } from '@/auth/session';
+import { Button, Text, TextField } from '@/components/ui';
+import { ApiError, ConfigError } from '@/api/client';
+import { describeError } from '@/data/errors';
 import { routes } from '@/navigation/routes';
 import { spacing } from '@/theme';
 
@@ -12,12 +15,14 @@ type Errors = Partial<Record<'name' | 'email' | 'password' | 'confirm', string>>
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Shared login / registration form with client-side validation.
- * Submitting does NOT authenticate yet — the Laravel Sanctum endpoints are built in the next
- * step, at which point `handleValid` becomes an API call that stores the token securely.
+ * Shared login / registration form: validates on the device, then signs in / up against the API.
+ * The token goes straight to secure storage (see auth/session.ts); this component never holds it.
+ * Server-side validation messages (taken email, weak password) are shown on the matching field.
  */
 export function AuthForm({ mode }: { mode: Mode }) {
-  const toast = useToast();
+  const { notice } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [formError, setFormError] = useState<string>();
   const isRegister = mode === 'register';
 
   const [name, setName] = useState('');
@@ -32,7 +37,10 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   const clear = (key: keyof Errors) => errors[key] && setErrors((e) => ({ ...e, [key]: undefined }));
 
-  const submit = () => {
+  const submit = async () => {
+    if (busy) return; // ignore double taps while the request is in flight
+    setFormError(undefined);
+    clearNotice();
     const next: Errors = {};
     if (isRegister && !name.trim()) next.name = 'Enter your name.';
     if (!EMAIL.test(email.trim())) next.email = 'Enter a valid email address.';
@@ -41,8 +49,32 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setErrors(next);
     if (Object.keys(next).length > 0) return;
 
-    // TODO(api): call POST /api/auth/{login|register}, store the Sanctum token in expo-secure-store.
-    toast.show('Looks good. Account sign-in connects to the API in the next build step.', 'info');
+    setBusy(true);
+    try {
+      if (isRegister) {
+        await signUp({ name, email, password, passwordConfirmation: confirm });
+      } else {
+        await signIn({ email, password });
+      }
+      // The navigator swaps to the app by itself once the session exists.
+    } catch (e) {
+      if (e instanceof ApiError && e.isValidation) {
+        setErrors({
+          name: e.fieldErrors.name,
+          email: e.fieldErrors.email,
+          password: e.fieldErrors.password,
+          confirm: e.fieldErrors.password_confirmation,
+        });
+        if (!Object.keys(e.fieldErrors).some((k) => ['name', 'email', 'password', 'password_confirmation'].includes(k)))
+          setFormError(describeError(e, 'Please check your details and try again.'));
+      } else if (e instanceof ConfigError) {
+        setFormError(e.message);
+      } else {
+        setFormError(describeError(e, 'Couldn’t sign you in. Please try again.'));
+      }
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -116,7 +148,18 @@ export function AuthForm({ mode }: { mode: Mode }) {
         />
       )}
 
-      <Button label={isRegister ? 'Create account' : 'Sign in'} fullWidth onPress={submit} />
+      {notice && !formError ? (
+        <Text variant="caption" tone="muted" accessibilityRole="alert">
+          {notice}
+        </Text>
+      ) : null}
+      {formError ? (
+        <Text variant="caption" tone="error" accessibilityRole="alert">
+          {formError}
+        </Text>
+      ) : null}
+
+      <Button label={isRegister ? 'Create account' : 'Sign in'} fullWidth loading={busy} onPress={submit} />
 
       <View style={styles.switch}>
         <Text variant="body" tone="muted">
@@ -126,6 +169,7 @@ export function AuthForm({ mode }: { mode: Mode }) {
         <Button
           label={isRegister ? 'Sign in' : 'Create account'}
           variant="ghost"
+          disabled={busy}
           onPress={() => router.replace(isRegister ? routes.login : routes.register)}
         />
       </View>

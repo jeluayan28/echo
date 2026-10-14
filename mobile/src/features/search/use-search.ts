@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import type { Collection, Memory } from '@/data/types';
 
+import { apiSearchProvider } from './api-provider';
 import { lexicalProvider, runSearch, type SearchHit, type SearchProvider, type SearchRequest } from './engine';
 
 export type SearchStatus = 'loading' | 'ready' | 'error';
@@ -9,7 +10,7 @@ export type SearchStatus = 'loading' | 'ready' | 'error';
 type Settled = { key: string; hits?: SearchHit[]; failed?: boolean };
 
 // A module constant: a fresh `[lexicalProvider]` per render would re-trigger the effect forever.
-const DEFAULT_PROVIDERS: SearchProvider[] = [lexicalProvider];
+const DEFAULT_PROVIDERS: SearchProvider[] = [apiSearchProvider];
 
 type DevGlobals = { __ECHO_FAIL_SEARCH?: boolean };
 
@@ -29,10 +30,18 @@ export function useSearch(
   const [settled, setSettled] = useState<Settled | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  const key = useMemo(
-    () => JSON.stringify([request.query.trim(), request.filters, request.sort, attempt]),
-    [request.query, request.filters, request.sort, attempt],
+  // Server-backed providers don't read the cache, so they only re-run when something actually changed
+  // (a memory was added, edited or removed) — not every time one is merely opened.
+  const dataVersion = useMemo(
+    () => `${memories.length}:${memories.reduce((latest, m) => (m.updatedAt > latest ? m.updatedAt : latest), '')}`,
+    [memories],
   );
+  const key = useMemo(
+    () => JSON.stringify([request.query.trim(), request.filters, request.sort, attempt, dataVersion]),
+    [request.query, request.filters, request.sort, attempt, dataVersion],
+  );
+
+  const readsCache = providers.some((p) => p.local);
 
   useEffect(() => {
     if (!enabled) return;
@@ -49,9 +58,9 @@ export function useSearch(
     return () => {
       cancelled = true;
     };
-    // `key` captures the request; memories/collections re-run it when the data changes.
+    // `key` captures the request (and a version of the data); a cache-reading provider also re-runs on every change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, memories, collections, providers, enabled]);
+  }, [key, readsCache ? memories : null, readsCache ? collections : null, providers, enabled]);
 
   const current = settled?.key === key;
   const status: SearchStatus = current ? (settled.failed ? 'error' : 'ready') : 'loading';

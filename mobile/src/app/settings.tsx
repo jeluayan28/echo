@@ -1,19 +1,30 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ListRow, ScreenHeader, SectionHeader } from '@/components/layout';
-import { Button, Icon, Screen, Text } from '@/components/ui';
+import { signOut } from '@/auth/session';
+import { Button, ConfirmDialog, Icon, Screen, Text, useToast } from '@/components/ui';
+import { useProfile } from '@/data/hooks';
+import { NotificationsSheet } from '@/features/settings/NotificationsSheet';
+import { ProfileSheet } from '@/features/settings/ProfileSheet';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
 import { colors, radius, spacing } from '@/theme';
 
 /**
- * Profile & settings. Account actions are real navigation; preference rows that depend on
- * the backend or notifications are rendered inert and labelled "Soon" (see ListRow `comingSoon`).
+ * Profile & settings. Profile and notification preferences are stored on the server; sign-out clears this
+ * device. Rows for features that don't exist yet (Theme, Privacy) are inert and labelled "Soon".
  */
 export default function SettingsScreen() {
   const goBack = useSafeBack();
+  const toast = useToast();
+  const profile = useProfile();
+  const [editing, setEditing] = useState(false);
+  const [notifications, setNotifications] = useState(false);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   return (
     <Screen scroll edges={['top', 'bottom']} header={<ScreenHeader title="Settings" onBack={goBack} />}>
@@ -22,23 +33,22 @@ export default function SettingsScreen() {
           <Icon name="user" size={28} color={colors.violet} />
         </View>
         <View style={{ flex: 1 }}>
-          <Text variant="heading">Guest</Text>
+          <Text variant="heading">{profile.name || 'Your account'}</Text>
           <Text variant="caption" tone="muted">
-            Sign in to sync memories across devices.
+            {profile.email ?? ''}
           </Text>
         </View>
       </View>
       <View style={styles.buttons}>
-        <Button label="Sign in" onPress={() => router.push(routes.login)} />
-        <Button label="Create account" variant="secondary" onPress={() => router.push(routes.register)} />
+        <Button label="Sign out" variant="secondary" loading={signingOut} onPress={() => setConfirmSignOut(true)} />
       </View>
 
       <SectionHeader title="Preferences" />
       <View style={styles.list}>
-        <ListRow icon="user" title="Profile" subtitle="Name and email" comingSoon />
+        <ListRow icon="user" title="Profile" subtitle="Name and email" onPress={() => setEditing(true)} />
         <ListRow icon="eye" title="Theme" subtitle="Appearance" comingSoon />
         <ListRow icon="lock" title="Privacy" subtitle="App lock and data" comingSoon />
-        <ListRow icon="bell" title="Notifications" subtitle="Daily summary and rediscovery reminders" comingSoon />
+        <ListRow icon="bell" title="Notifications" subtitle="Reminders" onPress={() => setNotifications(true)} />
       </View>
 
       {__DEV__ && (
@@ -56,6 +66,26 @@ export default function SettingsScreen() {
       <Text variant="caption" tone="muted" style={styles.version}>
         ECHO {Constants.expoConfig?.version ?? ''}
       </Text>
+
+      <ProfileSheet visible={editing} onClose={() => setEditing(false)} profile={profile} />
+      <NotificationsSheet visible={notifications} onClose={() => setNotifications(false)} />
+      <ConfirmDialog
+        visible={confirmSignOut}
+        title="Sign out of ECHO?"
+        message="Your memories stay safe in your account. They’re removed from this device until you sign in again."
+        confirmLabel="Sign out"
+        onCancel={() => setConfirmSignOut(false)}
+        onConfirm={async () => {
+          setConfirmSignOut(false);
+          setSigningOut(true);
+          try {
+            await signOut(); // the navigator returns to the sign-in screen by itself
+          } catch {
+            setSigningOut(false);
+            toast.show('Couldn’t sign out. Please try again.', 'error');
+          }
+        }}
+      />
     </Screen>
   );
 }

@@ -1,6 +1,7 @@
 import { repository, type UploadOptions } from '@/data/repository';
 import { SaveError, UploadError } from '@/data/errors';
 import type { Attachment, LocalFile, MemoryInput } from '@/data/types';
+import { deleteLocalFile } from '@/lib/files';
 
 export type AudioDraft = {
   /** A recording on the device that still needs uploading. */
@@ -49,12 +50,12 @@ export async function saveMemory({
   const record: MemoryInput = { ...input, attachment: input.type === 'voice' ? attachment : undefined };
 
   try {
-    if (memoryId) {
-      await repository.updateMemory(memoryId, record);
-      return { id: memoryId };
-    }
-    const created = await repository.createMemory(record);
-    return { id: created.id };
+    let id = memoryId;
+    if (memoryId) await repository.updateMemory(memoryId, record);
+    else id = (await repository.createMemory(record)).id;
+    // The server has the recording now; the device copy is no longer needed.
+    if (audio?.local && input.type === 'voice') await deleteLocalFile(audio.local.uri);
+    return { id: id! };
   } catch (e) {
     throw new SaveError('save', 'save-failed', e);
   }

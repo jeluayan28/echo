@@ -2,9 +2,11 @@
  * Data hooks — the only data surface screens should use.
  * Reads come from the cache behind the repository; writes go through `repository`.
  */
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 
 import { suggest, type SuggestionKind } from '@/features/rediscovery/rules';
+
+import { ApiError } from '@/api/client';
 
 import { repository } from './repository';
 import {
@@ -16,7 +18,8 @@ import {
   type MemoryFilter,
 } from './selectors';
 import { store } from './store';
-import type { Collection, Link, Memory, Profile, Reminder } from './types';
+import { runSync, useSyncStatus } from './sync';
+import type { Collection, Link, Memory, Profile, Reminder, TagCount } from './types';
 
 function useStoreState() {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
@@ -53,6 +56,41 @@ export function useCollection(id: string | undefined): Collection | undefined {
 
 export function useProfile(): Profile {
   return useStoreState().profile;
+}
+
+/** Tags with their live-memory counts, most used first (from the server). */
+export function useTags(): TagCount[] {
+  return useStoreState().tags;
+}
+
+export type MemoryDetailStatus = 'loading' | 'ready' | 'error' | 'notFound';
+
+/**
+ * A memory in FULL. List rows only carry an excerpt, so this fetches the real thing (and, with `open`, records
+ * that the user opened it). Shows the cached memory immediately but reports `loading` until the full text is here.
+ */
+export function useMemoryDetail(id: string | undefined, { open = false }: { open?: boolean } = {}) {
+  const cached = useMemory(id);
+  const [attempt, setAttempt] = useState(0);
+  const [failure, setFailure] = useState<{ id?: string; attempt: number; notFound: boolean } | null>(null);
+  const loaded = !!cached && !cached.partial;
+
+  useEffect(() => {
+    if (!id) return;
+    const controller = new AbortController();
+    repository.loadMemory(id, { open, signal: controller.signal }).catch((e) => {
+      if (controller.signal.aborted) return;
+      setFailure({ id, attempt, notFound: e instanceof ApiError && e.status === 404 });
+    });
+    return () => controller.abort();
+    // Fetch once per screen visit (and per retry); later edits arrive through the cache.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, attempt]);
+
+  const failed = failure && failure.id === id && failure.attempt === attempt ? failure : null;
+  let status: MemoryDetailStatus = loaded ? 'ready' : 'loading';
+  if (failed && !loaded) status = failed.notFound ? 'notFound' : 'error';
+  return { memory: cached, status, retry: () => setAttempt((n) => n + 1) };
 }
 
 /** Connections (user-created links) between existing memories, newest first. */
@@ -96,7 +134,6 @@ export const memoryActions = {
   restore: repository.restoreMemory.bind(repository),
   purge: repository.purgeMemory.bind(repository),
   upload: repository.uploadAttachment.bind(repository),
-  markOpened: repository.markOpened.bind(repository),
   link: repository.linkMemories.bind(repository),
   unlink: repository.unlinkMemories.bind(repository),
   dismissRediscovery: repository.dismissRediscovery.bind(repository),
@@ -120,41 +157,15 @@ export const collectionActions = {
 
 export type DashboardStatus = 'loading' | 'ready' | 'error';
 
-/** First sync of the session only; later visits show cached data immediately. */
-let hasSyncedOnce = false;
-
 /**
- * Everything the Memory Core screen needs. Counts and lists are derived from the live
- * data, so they update immediately when a memory is created, favorited, linked, etc.
+ * Everything the Memory Core screen needs. Counts and lists are derived from the cache, so they update
+ * immediately once the server has confirmed a change. Loading/refresh state is the shared sync state.
  */
 export function useDashboard() {
-  const [status, setStatus] = useState<DashboardStatus>(hasSyncedOnce ? 'ready' : 'loading');
-  const [refreshing, setRefreshing] = useState(false);
-  const inFlight = useRef(false);
-
+  const sync = useSyncStatus();
   const { memories, collections, links, rediscovery, reminders, profile } = useStoreState();
-
-  /** Resolves true on success. A failed *refresh* keeps showing the cached data. */
-  const sync = useCallback(async (kind: 'initial' | 'retry' | 'refresh'): Promise<boolean> => {
-    if (inFlight.current) return true;
-    inFlight.current = true;
-    // 'initial' runs from an effect while already 'loading', so it sets no state up front.
-    if (kind === 'refresh') setRefreshing(true);
-    else if (kind === 'retry') setStatus('loading');
-    try {
-      await repository.sync();
-      hasSyncedOnce = true;
-      setStatus('ready');
-      return true;
-    } catch {
-      // A failed pull-to-refresh keeps the cached dashboard on screen; the caller shows a toast.
-      if (!hasSyncedOnce) setStatus('error');
-      return false;
-    } finally {
-      inFlight.current = false;
-      setRefreshing(false);
-    }
-  }, []);
+  const status: DashboardStatus = sync.status === 'ready' ? 'ready' : sync.status === 'error' ? 'error' : 'loading';
+  const run = useCallback((kind: 'initial' | 'retry' | 'refresh') => runSync(kind), []);
 
   const data = useMemo(() => {
     const { suggestions, suppressedCount } = suggest({ memories, reminders, state: rediscovery, limit: 1 });
@@ -170,5 +181,5 @@ export function useDashboard() {
     };
   }, [memories, collections, links, rediscovery, reminders, profile]);
 
-  return { status, refreshing, data, sync };
+  return { status, refreshing: sync.refreshing, data, sync: run };
 }

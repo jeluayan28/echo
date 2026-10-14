@@ -17,8 +17,9 @@ import {
   SearchBar,
   Text,
 } from '@/components/ui';
-import { useCollections, useMemories } from '@/data/hooks';
-import { tagCounts } from '@/data/selectors';
+import { useCollections, useMemories, useTags } from '@/data/hooks';
+import { DataGate } from '@/features/sync/DataGate';
+import { usePullRefresh } from '@/lib/use-pull-refresh';
 import type { MemoryType } from '@/data/types';
 import { pluralize } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -59,7 +60,8 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const memories = useMemories();
   const collections = useCollections();
   const recent = useRecentSearches();
-  const tags = useMemo(() => tagCounts(memories), [memories]);
+  const tags = useTags();
+  const { onRefresh, refreshing } = usePullRefresh();
 
   const [query, setQuery] = useState(initial?.query ?? '');
   const [filters, setFilters] = useState<SearchFilters>(() => ({
@@ -208,6 +210,8 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   return (
     <Screen
       scroll
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       keyboardAvoiding
       edges={onBack ? ['top', 'bottom'] : ['top']}
       header={
@@ -286,7 +290,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
         </View>
       ) : null}
 
-      {body}
+      <DataGate>{body}</DataGate>
 
       <SearchFilterSheet
         visible={filterOpen}

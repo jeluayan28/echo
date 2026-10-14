@@ -3,8 +3,11 @@ import { useState } from 'react';
 
 import { ScreenHeader } from '@/components/layout';
 import { ConfirmDialog, ErrorState, IconButton, Screen, Text, useToast } from '@/components/ui';
+import { describeError } from '@/data/errors';
 import { collectionActions, useCollection, useFilteredMemories } from '@/data/hooks';
 import { CollectionSheet } from '@/features/collections/CollectionSheet';
+import { DataGate } from '@/features/sync/DataGate';
+import { usePullRefresh } from '@/lib/use-pull-refresh';
 import { MemoryList } from '@/features/memory/MemoryList';
 import { pluralize } from '@/lib/format';
 import { routes } from '@/navigation/routes';
@@ -16,13 +19,16 @@ export default function CollectionDetailScreen() {
   const toast = useToast();
   const collection = useCollection(id);
   const memories = useFilteredMemories({ collectionId: id });
+  const { onRefresh, refreshing } = usePullRefresh();
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   if (!collection) {
     return (
       <Screen edges={['top', 'bottom']} header={<ScreenHeader title="Collection" onBack={goBack} />}>
-        <ErrorState title="Collection not found" retryLabel="Go back" onRetry={goBack} />
+        <DataGate>
+          <ErrorState title="Collection not found" retryLabel="Go back" onRetry={goBack} />
+        </DataGate>
       </Screen>
     );
   }
@@ -30,6 +36,8 @@ export default function CollectionDetailScreen() {
   return (
     <Screen
       scroll
+      onRefresh={onRefresh}
+      refreshing={refreshing}
       edges={['top', 'bottom']}
       header={
         <ScreenHeader
@@ -83,8 +91,8 @@ export default function CollectionDetailScreen() {
             // go straight to the Vault list instead.
             router.dismissTo(routes.vault);
             toast.show('Collection deleted', 'success');
-          } catch {
-            toast.show('Couldn’t delete the collection. Please try again.', 'error');
+          } catch (e) {
+            toast.show(describeError(e, 'Couldn’t delete the collection. Please try again.'), 'error');
           }
         }}
       />

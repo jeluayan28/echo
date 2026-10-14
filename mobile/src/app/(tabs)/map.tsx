@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/layout';
-import { EmptyState, IconButton, Screen, SearchBar, Text } from '@/components/ui';
+import { EmptyState, ErrorState, IconButton, Screen, SearchBar, Text } from '@/components/ui';
 import { pluralize } from '@/lib/format';
 import { routes } from '@/navigation/routes';
 import { GraphCanvas, type GraphCanvasHandle } from '@/features/map/GraphCanvas';
@@ -11,12 +11,16 @@ import { GraphListView } from '@/features/map/GraphListView';
 import { FilterSheet } from '@/features/map/FilterSheet';
 import { NodeDetailPanel } from '@/features/map/NodeDetailPanel';
 import { useNeuralMap } from '@/features/map/use-neural-map';
+import { runSync, useSyncStatus } from '@/data/sync';
+import { usePullRefresh } from '@/lib/use-pull-refresh';
 import { colors, spacing, useLayout } from '@/theme';
 
 type Mode = 'graph' | 'list';
 
 export default function NeuralMapScreen() {
   const map = useNeuralMap();
+  const sync = useSyncStatus();
+  usePullRefresh(); // quiet refresh whenever the tab regains focus (the canvas itself can't pull to refresh)
   const { gutter } = useLayout();
   const canvas = useRef<GraphCanvasHandle>(null);
 
@@ -72,7 +76,18 @@ export default function NeuralMapScreen() {
 
   // ── empty states ────────────────────────────────────────────────────────────
   let body: React.ReactNode = null;
-  if (map.totalMemories === 0) {
+  if (sync.status === 'error') {
+    body = <ErrorState onRetry={() => void runSync('retry')} />;
+  } else if (sync.status !== 'ready') {
+    body = (
+      <View style={styles.center} accessibilityLiveRegion="polite">
+        <ActivityIndicator color={colors.violet} />
+        <Text variant="caption" tone="muted">
+          Loading your memories…
+        </Text>
+      </View>
+    );
+  } else if (map.totalMemories === 0) {
     body = (
       <EmptyState
         icon="map"

@@ -83,3 +83,9 @@ export function installNotificationHandling(): () => void {
   const subscription = Notifications.addNotificationResponseReceivedListener(open);
   return () => subscription.remove();
 }
+
+/** On sign-out: no reminder from this account may fire on the device afterwards. Best effort. */
+export async function cancelAllReminderNotifications(): Promise<void> {
+  if (!expoNotificationsPort.supported) return;
+  await Notifications.cancelAllScheduledNotificationsAsync().catch(() => undefined);
+}

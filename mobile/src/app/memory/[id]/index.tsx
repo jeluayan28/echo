@@ -1,11 +1,12 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader, SectionHeader } from '@/components/layout';
-import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Text, useToast } from '@/components/ui';
-import { memoryActions, useCollection, useMemories, useMemory, useSuggestions } from '@/data/hooks';
+import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Skeleton, Text, useToast } from '@/components/ui';
+import { memoryActions, useCollection, useMemories, useMemoryDetail, useSuggestions } from '@/data/hooks';
+import { describeError } from '@/data/errors';
 import { deleteMemoryWithUndo } from '@/features/memory/delete-memory';
 import { SuggestionCard } from '@/features/rediscovery/SuggestionCard';
 import { ReminderSection } from '@/features/reminders/ReminderSection';
@@ -32,7 +33,9 @@ export default function MemoryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const goBack = useSafeBack();
   const toast = useToast();
-  const memory = useMemory(id);
+  // Loads the full memory and records that it was opened (feeds "Continue exploring").
+  const { memory, status, retry } = useMemoryDetail(id, { open: true });
+  const [busy, setBusy] = useState(false);
   const collection = useCollection(memory?.collectionId);
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -40,19 +43,38 @@ export default function MemoryDetailScreen() {
   // Rule: linked to THIS memory and not opened recently (see features/rediscovery/rules.ts).
   const related = useSuggestions({ contextId: id, kinds: ['connected'], limit: 2 }).suggestions;
 
-  // Opening a memory feeds "Continue exploring" and resets its rediscovery idle time.
-  const exists = !!memory;
-  useEffect(() => {
-    if (exists) memoryActions.markOpened(id);
-  }, [exists, id]);
-
-  if (!memory) {
+  if (!memory || status === 'notFound') {
+    if (status === 'loading' && !memory) {
+      return (
+        <Screen edges={['top', 'bottom']} header={<ScreenHeader title="Memory" onBack={goBack} />}>
+          <Skeleton height={32} />
+          <Skeleton height={16} width="40%" />
+          <Skeleton height={120} />
+        </Screen>
+      );
+    }
     return (
       <Screen edges={['top', 'bottom']} header={<ScreenHeader title="Memory" onBack={goBack} />}>
-        <ErrorState title="Memory not found" message="It may have been deleted." retryLabel="Go back" onRetry={goBack} />
+        {status === 'error' ? (
+          <ErrorState onRetry={retry} />
+        ) : (
+          <ErrorState title="Memory not found" message="It may have been deleted." retryLabel="Go back" onRetry={goBack} />
+        )}
       </Screen>
     );
   }
+
+  const toggle = async (patch: { pinned: boolean } | { favorite: boolean }) => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await memoryActions.update(memory.id, patch);
+    } catch (e) {
+      toast.show(describeError(e, 'Couldn’t update this memory. Please try again.'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const linked = all.filter((m) => memory.linkedIds.includes(m.id));
   const attachment = memory.attachment;
@@ -72,13 +94,13 @@ export default function MemoryDetailScreen() {
                 icon="pin"
                 label={memory.pinned ? 'Unpin' : 'Pin'}
                 active={memory.pinned}
-                onPress={() => memoryActions.update(memory.id, { pinned: !memory.pinned })}
+                onPress={() => toggle({ pinned: !memory.pinned })}
               />
               <IconButton
                 icon="favorite"
                 label={memory.favorite ? 'Remove from favorites' : 'Add to favorites'}
                 active={memory.favorite}
-                onPress={() => memoryActions.update(memory.id, { favorite: !memory.favorite })}
+                onPress={() => toggle({ favorite: !memory.favorite })}
               />
               <IconButton icon="edit" label="Edit" onPress={() => router.push(routes.editMemory(memory.id))} />
               <IconButton icon="delete" label="Delete" onPress={() => setConfirmDelete(true)} />
@@ -87,6 +109,11 @@ export default function MemoryDetailScreen() {
         />
       }
     >
+      {status === 'error' ? (
+        <Text variant="caption" tone="error" accessibilityRole="alert" onPress={retry}>
+          Couldn’t load the full text. Tap to retry.
+        </Text>
+      ) : null}
       <Text variant="display">{memory.title}</Text>
       <Text variant="caption" tone="muted">
         Created {formatActivity(memory.createdAt)}
@@ -164,8 +191,8 @@ export default function MemoryDetailScreen() {
           try {
             await deleteMemoryWithUndo(memory.id, toast);
             goBack();
-          } catch {
-            toast.show('Couldn’t delete. Please try again.', 'error');
+          } catch (e) {
+            toast.show(describeError(e, 'Couldn’t delete. Please try again.'), 'error');
           }
         }}
       />

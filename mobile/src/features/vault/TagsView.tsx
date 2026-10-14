@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Chip, EmptyState } from '@/components/ui';
 import type { Memory } from '@/data/types';
-import { tagCounts } from '@/data/selectors';
+import { useTags } from '@/data/hooks';
 import { MemoryList } from '@/features/memory/MemoryList';
 import { spacing } from '@/theme';
 
@@ -11,7 +11,7 @@ const UNTAGGED = '\u0000untagged'; // can't collide with a real tag (tags are no
 
 /** Tag cloud (plus "Untagged"); selecting one filters the memories below it. Tap again to clear. */
 export function TagsView({ memories }: { memories: Memory[] }) {
-  const tags = useMemo(() => tagCounts(memories), [memories]);
+  const tags = useTags(); // counts come from the server
   const untagged = useMemo(() => memories.filter((m) => m.tags.length === 0), [memories]);
   const [selected, setSelected] = useState<string | undefined>();
 

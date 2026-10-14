@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { Checkbox, Sheet, Text, useToast } from '@/components/ui';
 import { memoryActions, useMemories } from '@/data/hooks';
+import { describeError } from '@/data/errors';
 import type { Memory } from '@/data/types';
 import { spacing } from '@/theme';
 
@@ -16,12 +18,23 @@ export function LinkSheet({ memory, visible, onClose }: LinkSheetProps) {
   const toast = useToast();
   const others = useMemories().filter((m) => m.id !== memory.id);
 
+  // Ids with a request in flight: their checkbox ignores taps until the server answers.
+  const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
+
   const toggle = async (other: Memory, next: boolean) => {
+    if (pending.has(other.id)) return;
+    setPending((p) => new Set(p).add(other.id));
     try {
       if (next) await memoryActions.link(memory.id, other.id);
       else await memoryActions.unlink(memory.id, other.id);
-    } catch {
-      toast.show('Couldn’t update the link. Please try again.', 'error');
+    } catch (e) {
+      toast.show(describeError(e, 'Couldn’t update the link. Please try again.'), 'error');
+    } finally {
+      setPending((p) => {
+        const n = new Set(p);
+        n.delete(other.id);
+        return n;
+      });
     }
   };
 
@@ -39,6 +52,7 @@ export function LinkSheet({ memory, visible, onClose }: LinkSheetProps) {
                 key={m.id}
                 label={m.title}
                 checked={memory.linkedIds.includes(m.id)}
+                disabled={pending.has(m.id)}
                 onChange={(next) => toggle(m, next)}
               />
             ))}
