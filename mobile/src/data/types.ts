@@ -1,18 +1,18 @@
 /**
- * Domain types shared by the UI and the (future) API client.
- * Field names mirror the planned Laravel resources (snake_case ↔ camelCase at the API boundary).
+ * Domain types shared by the UI and the API client.
+ * Field names mirror the Laravel resources (snake_case ↔ camelCase at the API boundary, see api/mappers.ts).
  */
 
 export type MemoryType = 'note' | 'idea' | 'link' | 'voice';
 
 /**
- * Metadata for a file that lives OUTSIDE the database (device file now, object storage later).
- * The database only ever stores this record and the `uri`/storage reference — never the bytes.
+ * Metadata for a file that lives OUTSIDE the database (object storage / private disk on the server).
+ * The database only ever stores this record — never the bytes.
  */
 export type Attachment = {
   id: string;
   kind: 'audio';
-  /** Storage reference: a local file URI in the sample stage, an object-storage key/URL later. */
+  /** Where to play it from: a short-lived signed URL issued by the API (refetch the memory for a fresh one). */
   uri: string;
   mimeType: string;
   sizeBytes?: number;
@@ -42,6 +42,11 @@ export type Memory = {
   updatedAt: string; // ISO 8601
   /** Last time the user opened the detail screen. Never changes `updatedAt`. */
   lastOpenedAt?: string; // ISO 8601
+  /**
+   * True while only the list representation is known: `body` is then a short excerpt of the real text.
+   * The detail screen and the editor load the full memory first (see `useMemoryDetail`).
+   */
+  partial?: boolean;
 };
 
 export type Collection = {
@@ -87,6 +92,15 @@ export type Profile = {
   email?: string;
 };
 
+/** A tag with the number of live memories that use it. */
+export type TagCount = { tag: string; count: number };
+
+/** Per-account reminder settings, kept on the server. */
+export type NotificationSettings = {
+  remindersEnabled: boolean;
+  timezone: string;
+};
+
 /** What the create/edit form produces. `attachment` must already be uploaded. */
 export type MemoryInput = Pick<Memory, 'type' | 'title' | 'body' | 'tags' | 'favorite' | 'pinned'> &
   Partial<Pick<Memory, 'sourceUrl' | 'attachment' | 'collectionId'>>;
@@ -97,12 +111,4 @@ export type LocalFile = {
   mimeType: string;
   sizeBytes?: number;
   durationMs?: number;
-};
-
-/** A deleted memory kept briefly so the delete can be undone. */
-export type TrashedMemory = {
-  memory: Memory;
-  /** Links removed together with the memory, restored with it if their other end still exists. */
-  links: Link[];
-  deletedAt: string;
 };

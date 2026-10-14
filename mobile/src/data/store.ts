@@ -1,22 +1,21 @@
 /**
- * In-memory data store — the cache behind the sample repository.
+ * Server-state cache.
  *
- * Only `sample-repository.ts` (writes) and `hooks.ts` (reads) touch this file. When the Laravel API
- * is ready, the repository fetches into a query cache instead and this file goes away.
+ * Holds what the API last told us; nothing in here is the source of truth. Only `api-repository.ts` writes to
+ * it (always with data the server just returned), and `hooks.ts` reads from it. It starts empty, is replaced
+ * wholesale by a sync, and is wiped on sign-out so one account's data can never show up in another's session.
  *
- * PERSISTENCE: none. Everything here is lost when the app process restarts.
+ * Not persisted: a cold start fetches again. (Rediscovery snooze/dismiss choices are the one thing that exists
+ * only here — the API has no endpoint for them yet.)
  */
-import { sampleCollections, sampleLinks, sampleMemories, sampleProfile, withLinkedIds } from './sample-data';
 import type {
   Collection,
-  CollectionInput,
   Link,
   Memory,
-  MemoryInput,
   Profile,
   RediscoveryState,
   Reminder,
-  TrashedMemory,
+  TagCount,
 } from './types';
 
 export type State = {
@@ -24,25 +23,26 @@ export type State = {
   memories: Memory[];
   collections: Collection[];
   links: Link[];
-  /** Recently deleted memories, restorable until purged. */
-  trash: TrashedMemory[];
-  /** memoryId → the user's dismiss / snooze decisions for Rediscovery. */
+  tags: TagCount[];
+  /** memoryId → the user's dismiss / snooze decisions for Rediscovery (device-local). */
   rediscovery: Record<string, RediscoveryState>;
   /** memoryId → its reminder. */
   reminders: Record<string, Reminder>;
 };
 
 const initialState = (): State => ({
-  profile: sampleProfile,
-  memories: sampleMemories,
-  collections: sampleCollections,
-  links: sampleLinks,
-  trash: [],
+  profile: { name: '' },
+  memories: [],
+  collections: [],
+  links: [],
+  tags: [],
   rediscovery: {},
   reminders: {},
 });
 
 let state: State = initialState();
+/** Bumped by every reset. A response that arrives after a sign-out carries an old epoch and is dropped. */
+let epoch = 0;
 const listeners = new Set<() => void>();
 
 function setState(next: State) {
@@ -50,16 +50,30 @@ function setState(next: State) {
   listeners.forEach((l) => l());
 }
 
-/** Recompute every memory's `linkedIds` from the link list. */
-function relink(memories: Memory[], links: Link[]): Memory[] {
-  return withLinkedIds(memories, links);
+/** Recompute every memory's `linkedIds` from the link list, so the two can never disagree. */
+export function withLinkedIds(memories: Memory[], links: Link[]): Memory[] {
+  const byMemory = new Map<string, string[]>();
+  const add = (a: string, b: string) => byMemory.set(a, [...(byMemory.get(a) ?? []), b]);
+  for (const l of links) {
+    add(l.fromId, l.toId);
+    add(l.toId, l.fromId);
+  }
+  return memories.map((m) => {
+    const linkedIds = byMemory.get(m.id) ?? [];
+    const same = m.linkedIds.length === linkedIds.length && m.linkedIds.every((id, i) => id === linkedIds[i]);
+    return same ? m : { ...m, linkedIds };
+  });
 }
 
-let idCounter = 0;
-const newId = (prefix: string) => `${prefix}${Date.now().toString(36)}${(idCounter++).toString(36)}`;
-
-/** Fields that mean the user organized/edited the memory, as opposed to just favoriting/pinning it. */
-const isContentPatch = (patch: object) => Object.keys(patch).some((k) => k !== 'favorite' && k !== 'pinned');
+/**
+ * Merge a freshly fetched memory into what we already hold. A list row only carries an excerpt, so it must
+ * never overwrite a full body we loaded earlier — unless the server says the memory changed since.
+ */
+export function mergeMemory(existing: Memory | undefined, incoming: Memory): Memory {
+  if (!incoming.partial || !existing || existing.partial) return incoming;
+  if (existing.updatedAt !== incoming.updatedAt) return incoming;
+  return { ...incoming, body: existing.body, partial: undefined };
+}
 
 export const store = {
   subscribe(listener: () => void) {
@@ -69,58 +83,64 @@ export const store = {
     };
   },
   getState: () => state,
+  epoch: () => epoch,
 
-  /** Test helper: replace the whole state (defaults to the seeded sample data). */
-  __reset(next?: Partial<State>) {
+  /** Forget everything (sign-out, session expiry, tests). */
+  reset(next?: Partial<State>) {
+    epoch += 1;
     setState({ ...initialState(), ...next });
   },
 
+  /** Replace the whole cache with a complete sync result. */
+  replaceAll(data: {
+    profile?: Profile;
+    memories: Memory[];
+    collections: Collection[];
+    links: Link[];
+    tags: TagCount[];
+    reminders: Reminder[];
+  }) {
+    const byId = new Map(state.memories.map((m) => [m.id, m]));
+    const memories = data.memories.map((m) => mergeMemory(byId.get(m.id), m));
+    const alive = new Set(memories.map((m) => m.id));
+    const remindersById: Record<string, Reminder> = {};
+    for (const r of data.reminders) if (alive.has(r.memoryId)) remindersById[r.memoryId] = r;
+    // Dismiss / snooze choices for memories that no longer exist are dropped with them.
+    const rediscovery = Object.fromEntries(Object.entries(state.rediscovery).filter(([id]) => alive.has(id)));
+    setState({
+      profile: data.profile ?? state.profile,
+      memories: withLinkedIds(memories, data.links),
+      collections: data.collections,
+      links: data.links,
+      tags: data.tags,
+      reminders: remindersById,
+      rediscovery,
+    });
+  },
+
+  setProfile(profile: Profile) {
+    setState({ ...state, profile });
+  },
+
+  setTags(tags: TagCount[]) {
+    setState({ ...state, tags });
+  },
+
+  setLinks(links: Link[]) {
+    setState({ ...state, links, memories: withLinkedIds(state.memories, links) });
+  },
+
   // ── memories ──────────────────────────────────────────────────────────────
-  createMemory(input: MemoryInput): Memory {
-    const now = new Date().toISOString();
-    const memory: Memory = {
-      ...input,
-      id: newId('m'),
-      linkedIds: [],
-      createdAt: now,
-      updatedAt: now,
-      lastOpenedAt: now,
-    };
-    setState({ ...state, memories: [memory, ...state.memories] });
-    return memory;
+  upsertMemory(memory: Memory) {
+    const index = state.memories.findIndex((m) => m.id === memory.id);
+    const merged = mergeMemory(state.memories[index], memory);
+    const memories =
+      index === -1 ? [merged, ...state.memories] : state.memories.map((m, i) => (i === index ? merged : m));
+    setState({ ...state, memories: withLinkedIds(memories, state.links) });
   },
 
-  updateMemory(id: string, patch: Partial<MemoryInput>) {
-    // Toggling favorite/pin is organizing, not editing: it must not reset `updatedAt`
-    // (which would also reset the memory's rediscovery idle time).
-    const updatedAt = new Date().toISOString();
-    const content = isContentPatch(patch);
-    setState({
-      ...state,
-      memories: state.memories.map((m) =>
-        m.id === id ? { ...m, ...patch, ...(content ? { updatedAt } : {}) } : m,
-      ),
-    });
-  },
-
-  markOpened(id: string) {
-    const lastOpenedAt = new Date().toISOString();
-    // Opening a memory whose reminder time has passed fulfils that reminder.
-    const reminder = state.reminders[id];
-    const due = !!reminder && reminder.fireAt <= lastOpenedAt;
-    const { [id]: _done, ...rest } = state.reminders;
-    setState({
-      ...state,
-      reminders: due ? rest : state.reminders,
-      memories: state.memories.map((m) => (m.id === id ? { ...m, lastOpenedAt } : m)),
-    });
-  },
-
-  /** Soft delete: moves the memory (and its links) to the trash so it can be restored. */
-  trashMemory(id: string) {
-    const memory = state.memories.find((m) => m.id === id);
-    if (!memory) return;
-    const removedLinks = state.links.filter((l) => l.fromId === id || l.toId === id);
+  /** Remove a memory and everything that hangs off it. */
+  removeMemory(id: string) {
     const links = state.links.filter((l) => l.fromId !== id && l.toId !== id);
     const { [id]: _state, ...rediscovery } = state.rediscovery;
     const { [id]: _reminder, ...reminders } = state.reminders;
@@ -129,61 +149,30 @@ export const store = {
       links,
       rediscovery,
       reminders,
-      memories: relink(
+      memories: withLinkedIds(
         state.memories.filter((m) => m.id !== id),
         links,
       ),
-      trash: [{ memory, links: removedLinks, deletedAt: new Date().toISOString() }, ...state.trash],
     });
-  },
-
-  /** Undo a soft delete. Returns the restored memory, or undefined if it was already purged. */
-  restoreMemory(id: string): Memory | undefined {
-    const entry = state.trash.find((t) => t.memory.id === id);
-    if (!entry) return undefined;
-    const alive = new Set(state.memories.map((m) => m.id));
-    // Only restore links whose other end still exists.
-    const links = [
-      ...state.links,
-      ...entry.links.filter((l) => alive.has(l.fromId === id ? l.toId : l.fromId)),
-    ];
-    // If its collection was deleted in the meantime, it comes back uncollected.
-    const collectionOk = !entry.memory.collectionId || state.collections.some((c) => c.id === entry.memory.collectionId);
-    const memory = { ...entry.memory, collectionId: collectionOk ? entry.memory.collectionId : undefined };
-    setState({
-      ...state,
-      links,
-      trash: state.trash.filter((t) => t.memory.id !== id),
-      memories: relink([memory, ...state.memories], links),
-    });
-    return memory;
-  },
-
-  /** Permanently remove a trashed memory. Returns it so the caller can clean up its files. */
-  purgeMemory(id: string): Memory | undefined {
-    const entry = state.trash.find((t) => t.memory.id === id);
-    if (!entry) return undefined;
-    setState({ ...state, trash: state.trash.filter((t) => t.memory.id !== id) });
-    return entry.memory;
   },
 
   // ── links ─────────────────────────────────────────────────────────────────
-  addLink(fromId: string, toId: string) {
+  addLink(link: Link) {
     const exists = state.links.some(
-      (l) => (l.fromId === fromId && l.toId === toId) || (l.fromId === toId && l.toId === fromId),
+      (l) =>
+        (l.fromId === link.fromId && l.toId === link.toId) || (l.fromId === link.toId && l.toId === link.fromId),
     );
-    if (exists || fromId === toId) return;
-    const links = [...state.links, { id: newId('l'), fromId, toId, createdAt: new Date().toISOString() }];
-    setState({ ...state, links, memories: relink(state.memories, links) });
+    if (exists || link.fromId === link.toId) return;
+    store.setLinks([...state.links, link]);
   },
 
   removeLink(aId: string, bId: string) {
-    const links = state.links.filter(
-      (l) => !((l.fromId === aId && l.toId === bId) || (l.fromId === bId && l.toId === aId)),
+    store.setLinks(
+      state.links.filter((l) => !((l.fromId === aId && l.toId === bId) || (l.fromId === bId && l.toId === aId))),
     );
-    setState({ ...state, links, memories: relink(state.memories, links) });
   },
 
+  // ── rediscovery (device-local) ────────────────────────────────────────────
   dismissRediscovery(id: string, at: string = new Date().toISOString()) {
     const current = state.rediscovery[id] ?? {};
     setState({ ...state, rediscovery: { ...state.rediscovery, [id]: { ...current, dismissedAt: at } } });
@@ -200,32 +189,22 @@ export const store = {
   },
 
   clearReminder(memoryId: string) {
+    if (!(memoryId in state.reminders)) return;
     const { [memoryId]: _removed, ...reminders } = state.reminders;
     setState({ ...state, reminders });
   },
 
   // ── collections ───────────────────────────────────────────────────────────
-  createCollection(input: CollectionInput): Collection {
-    const collection: Collection = {
-      id: newId('c'),
-      name: input.name.trim(),
-      description: input.description?.trim() || undefined,
-    };
-    setState({ ...state, collections: [...state.collections, collection] });
-    return collection;
-  },
-
-  updateCollection(id: string, input: CollectionInput) {
-    setState({
-      ...state,
-      collections: state.collections.map((c) =>
-        c.id === id ? { ...c, name: input.name.trim(), description: input.description?.trim() || undefined } : c,
-      ),
-    });
+  upsertCollection(collection: Collection) {
+    const exists = state.collections.some((c) => c.id === collection.id);
+    const collections = exists
+      ? state.collections.map((c) => (c.id === collection.id ? collection : c))
+      : [...state.collections, collection];
+    setState({ ...state, collections: collections.sort((a, b) => a.name.localeCompare(b.name)) });
   },
 
   /** Deleting a collection never deletes its memories — they become uncollected. */
-  deleteCollection(id: string) {
+  removeCollection(id: string) {
     setState({
       ...state,
       collections: state.collections.filter((c) => c.id !== id),

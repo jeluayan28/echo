@@ -2,10 +2,10 @@
  * The data boundary. Everything the UI reads or writes goes through this interface
  * (reads via the hooks in `hooks.ts`, writes via `memoryActions` / `collectionActions`).
  *
- * To connect the Laravel API: write `api-repository.ts` implementing `EchoRepository`,
- * change the single export below, and delete `sample-*.ts` / `store.ts`.
+ * The implementation is `api-repository.ts`: every write waits for the Laravel API to confirm and only then
+ * updates the cache the hooks read from. Nothing is shown as saved before the server says it is.
  */
-import { sampleRepository } from './sample-repository';
+import { apiRepository } from './api-repository';
 import type {
   Attachment,
   Collection,
@@ -23,12 +23,21 @@ export type UploadOptions = {
   signal?: AbortSignal;
 };
 
+export type LoadMemoryOptions = {
+  /** Also record that the user opened it (powers "Continue exploring"). */
+  open?: boolean;
+  signal?: AbortSignal;
+};
+
 export interface EchoRepository {
   /**
-   * Fetch the latest data into the local cache the hooks read from.
-   * Rejects when the network/API fails. Called on first load, pull-to-refresh and retry.
+   * Fetch the latest data from the server into the cache the hooks read from. All-or-nothing: if any part
+   * fails the cache is left untouched and this rejects. Called on sign-in, pull-to-refresh and retry.
    */
   sync(): Promise<void>;
+
+  /** Fetch ONE memory in full (list rows only carry an excerpt). Rejects with `ApiError` 404 if it is gone. */
+  loadMemory(id: string, options?: LoadMemoryOptions): Promise<Memory>;
 
   /**
    * Send a file to storage and return its metadata record. Rejects with `UploadError`.
@@ -45,8 +54,6 @@ export interface EchoRepository {
   /** Permanently delete a trashed memory and its stored files. */
   purgeMemory(id: string): Promise<void>;
 
-  /** Records that the user opened a memory (powers "Continue exploring"). Not an edit. */
-  markOpened(id: string): Promise<void>;
   linkMemories(fromId: string, toId: string): Promise<void>;
   unlinkMemories(aId: string, bId: string): Promise<void>;
   /** The user said "not for me" to a suggestion; Rediscovery honors a cooldown (see rediscovery/rules.ts). */
@@ -64,4 +71,4 @@ export interface EchoRepository {
   deleteCollection(id: string): Promise<void>;
 }
 
-export const repository: EchoRepository = sampleRepository;
+export const repository: EchoRepository = apiRepository;
