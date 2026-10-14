@@ -38,8 +38,14 @@ class MemoryWriter
         $replaced = null;
 
         DB::transaction(function () use ($memory, $data, &$replaced) {
-            $memory->fill(Arr::only($data, array_diff(self::FIELDS, ['type']))); // the type is fixed once created
-            $memory->save();
+            $fields = Arr::only($data, array_diff(self::FIELDS, ['type'])); // the type is fixed once created
+            $memory->fill($fields);
+
+            // Starring or pinning is organizing, not editing: it must not reset `updated_at`, because the app uses
+            // that to decide how long a memory has been idle (Rediscovery).
+            $organizingOnly = array_diff(array_keys($fields), ['favorite', 'pinned']) === []
+                && ! array_key_exists('tags', $data) && empty($data['attachment_id']);
+            $organizingOnly ? Memory::withoutTimestamps(fn () => $memory->save()) : $memory->save();
 
             if (array_key_exists('tags', $data)) {
                 $this->tags->sync($memory, $data['tags'] ?? []);

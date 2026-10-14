@@ -42,6 +42,19 @@ class MemoryApiTest extends ApiTestCase
         $this->assertSame(2, $this->user->tags()->count());
     }
 
+    public function test_starring_or_pinning_is_not_an_edit_but_changing_content_is(): void
+    {
+        $memory = Memory::factory()->for($this->user)->create(['updated_at' => now()->subDays(40)]);
+        $before = $memory->fresh()->updated_at->toIso8601String();
+
+        $this->patchJson("/api/v1/memories/{$memory->id}", ['favorite' => true, 'pinned' => true])->assertOk();
+        $this->assertSame($before, $memory->fresh()->updated_at->toIso8601String());
+        $this->assertTrue($memory->fresh()->favorite);
+
+        $this->patchJson("/api/v1/memories/{$memory->id}", ['title' => 'Renamed'])->assertOk();
+        $this->assertNotSame($before, $memory->fresh()->updated_at->toIso8601String());
+    }
+
     public function test_the_owner_comes_from_the_token_never_from_the_request(): void
     {
         $other = User::factory()->create();
