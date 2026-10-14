@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
 import { Chip, Icon, PressableScale, Text, type IconName } from '@/components/ui';
 import { lastActivityAt, lastActivityKind } from '@/data/selectors';
 import type { Memory, MemoryType } from '@/data/types';
 import { formatActivity } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, radius, spacing, useLayout } from '@/theme';
 
@@ -30,7 +30,7 @@ export function ContinueExploring({ memories }: { memories: Memory[] }) {
       {memories.map((m) => (
         <PressableScale
           key={m.id}
-          onPress={() => router.push(routes.memory(m.id))}
+          onPress={() => pushOnce(routes.memory(m.id))}
           accessibilityRole="button"
           accessibilityLabel={`${m.title}. ${lastActivityKind(m)} ${formatActivity(lastActivityAt(m))}`}
           pressedScale={0.985}

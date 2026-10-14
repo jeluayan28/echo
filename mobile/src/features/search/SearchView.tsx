@@ -1,4 +1,3 @@
-import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 
@@ -23,6 +22,7 @@ import { usePullRefresh } from '@/lib/use-pull-refresh';
 import type { MemoryType } from '@/data/types';
 import { pluralize } from '@/lib/format';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, hitTarget, radius, spacing } from '@/theme';
 
@@ -94,7 +94,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const commit = () => recentSearches.add(query);
   const open = (id: string) => {
     recentSearches.add(debounced);
-    router.push(routes.memory(id));
+    pushOnce(routes.memory(id));
   };
 
   // ── body ────────────────────────────────────────────────────────────────────
@@ -143,7 +143,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
             title="Nothing to search yet"
             message="Capture a memory and it’s searchable straight away."
             actionLabel="Capture a memory"
-            onAction={() => router.push(routes.newMemory())}
+            onAction={() => pushOnce(routes.newMemory())}
           />
         ) : recent.length === 0 && tags.length === 0 ? (
           <Text variant="body" tone="muted">

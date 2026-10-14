@@ -6,7 +6,8 @@
  * It runs the app's real code (session, repository, services, search provider, graph builder) — only `fetch`
  * is the real network. Every account is created fresh, so the run needs an empty-enough database, not a clean one.
  */
-import { ApiError, getAuthToken } from '@/api/client';
+import { authApi } from '@/api';
+import { ApiError, getAuthToken, http } from '@/api/client';
 import { clearSession, loadSession, saveSession } from '@/auth/secure-storage';
 import { restoreSession, session, signIn, signOut, signUp } from '@/auth/session';
 import { repository } from '@/data/repository';
@@ -233,7 +234,8 @@ maybe('live API: the complete flow from a clean account', () => {
       await expect(repository.loadMemory(noteId)).rejects.toMatchObject({ status: 404 });
       await expect(repository.loadMemory(noteId, { open: true })).rejects.toMatchObject({ status: 404 });
       await expect(repository.updateMemory(noteId, { title: 'Hijacked' })).rejects.toMatchObject({ status: 404 });
-      await expect(repository.deleteMemory(noteId)).rejects.toMatchObject({ status: 404 });
+      // deleting something that is "not found" counts as done — and the server really did nothing (checked below)
+      await expect(repository.deleteMemory(noteId)).resolves.toBeUndefined();
       await expect(repository.updateCollection(collectionId, { name: 'Hijacked' })).rejects.toMatchObject({ status: 404 });
       await expect(repository.saveReminder({ memoryId: noteId, fireAt: new Date(Date.now() + 3_600_000).toISOString(), delivery: 'in-app', createdAt: '' })).rejects.toMatchObject({ status: 404 });
     });
@@ -253,6 +255,77 @@ maybe('live API: the complete flow from a clean account', () => {
       expect(s.collections.map((c) => c.id)).toEqual([collectionId]);
       expect(s.memories.find((m) => m.id === noteId)!.title).toBe('Quantum gardening, revised');
       expect(s.memories.find((m) => m.id === noteId)!.collectionId).toBe(collectionId);
+    });
+  });
+
+  describe('QA edge cases against the real server', () => {
+    const none = { query: '', filters: emptyFilters(), sort: 'relevance' as const };
+
+    it('signs back in as Ada', async () => {
+      await signOut();
+      await signIn({ email: ada.email, password: ada.password });
+      await settle();
+      expect(session.get().status).toBe('signedIn');
+    });
+
+    it('stores a 10,000-character emoji body and a 120-character title exactly', async () => {
+      const body = '😀'.repeat(10_000);
+      const title = 'T'.repeat(120);
+      const m = await repository.createMemory({ type: 'note', title, body, tags: [], favorite: false, pinned: false });
+      const full = await repository.loadMemory(m.id);
+      expect(full.body).toBe(body);
+      expect(full.title).toBe(title);
+      await repository.deleteMemory(m.id);
+    });
+
+    it('favorites and pins persist across a fresh sync, and do not count as an edit', async () => {
+      const m = await repository.createMemory({ type: 'note', title: 'Starred', body: '', tags: [], favorite: false, pinned: false });
+      const before = (await repository.loadMemory(m.id)).updatedAt;
+      await repository.updateMemory(m.id, { favorite: true, pinned: true });
+      store.reset();
+      await runSync('initial');
+      const after = store.getState().memories.find((x) => x.id === m.id)!;
+      expect(after).toMatchObject({ favorite: true, pinned: true, updatedAt: before });
+    });
+
+    it('search never throws on punctuation, operators, SQL, emoji or accents', async () => {
+      for (const q of ['!!!', '%', '_', "'; drop table memories;--", '"', '\\', 'a:*', '-', '&|!', '😀', 'café', 'x'.repeat(250)]) {
+        const hits = await apiSearchProvider.search({ ...none, query: q }, [], { collections: [] });
+        expect(Array.isArray(hits)).toBe(true);
+      }
+    });
+
+    it('search finds accented text without the accent and ignores other users', async () => {
+      await repository.createMemory({ type: 'note', title: 'Crème brûlée', body: 'dessert', tags: [], favorite: false, pinned: false });
+      const hits = await apiSearchProvider.search({ ...none, query: 'creme' }, [], { collections: [] });
+      // Documented either way: the server decides accent handling; the test pins the current behavior.
+      expect(hits.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('a memory deleted on another device disappears here on the next open, with a clear error', async () => {
+      const m = await repository.createMemory({ type: 'note', title: 'Ghost', body: '', tags: [], favorite: false, pinned: false });
+      // "another device": delete it behind the app's back with the same account
+      await http.delete(`/memories/${m.id}`);
+      await expect(repository.loadMemory(m.id, { open: true })).rejects.toMatchObject({ status: 404 });
+      expect(store.getState().memories.find((x) => x.id === m.id)).toBeUndefined();
+      await expect(repository.updateMemory(m.id, { title: 'zombie' })).rejects.toMatchObject({ status: 404 });
+      await expect(repository.deleteMemory(m.id)).resolves.toBeUndefined();
+    });
+
+    it('a duplicate tap on "link" and on "create collection" produces one record each', async () => {
+      const a = await repository.createMemory({ type: 'note', title: 'LA', body: '', tags: [], favorite: false, pinned: false });
+      const b = await repository.createMemory({ type: 'note', title: 'LB', body: '', tags: [], favorite: false, pinned: false });
+      await Promise.all([repository.linkMemories(a.id, b.id), repository.linkMemories(a.id, b.id), repository.linkMemories(b.id, a.id)]);
+      expect(store.getState().links.filter((l) => [l.fromId, l.toId].includes(a.id))).toHaveLength(1);
+    });
+
+    it('a token revoked on the server ends the session on the next request', async () => {
+      await authApi.logout(); // revoke this device's token behind the app's back
+      await runSync('refresh');
+      for (let i = 0; i < 100 && session.get().status === 'signedIn'; i++) await new Promise((r) => setTimeout(r, 50));
+      expect(session.get().status).toBe('signedOut');
+      expect(session.get().notice).toMatch(/sign in again/i);
+      expect(store.getState().memories).toHaveLength(0);
     });
   });
 

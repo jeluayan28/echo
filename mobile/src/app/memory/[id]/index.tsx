@@ -1,4 +1,4 @@
-import { router, useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -15,8 +15,10 @@ import { MemoryList } from '@/features/memory/MemoryList';
 import { VoicePlayer } from '@/features/memory/VoicePlayer';
 import { formatBytes } from '@/lib/files';
 import { formatActivity, formatDuration } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
+import { useSingleFlight } from '@/lib/single-flight';
 import { spacing } from '@/theme';
 
 const typeLabel = { note: 'Note', idea: 'Idea', link: 'Link', voice: 'Voice memo' } as const;
@@ -35,7 +37,8 @@ export default function MemoryDetailScreen() {
   const toast = useToast();
   // Loads the full memory and records that it was opened (feeds "Continue exploring").
   const { memory, status, retry } = useMemoryDetail(id, { open: true });
-  const [busy, setBusy] = useState(false);
+  const [, setBusy] = useState(false);
+  const once = useSingleFlight();
   const collection = useCollection(memory?.collectionId);
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -64,8 +67,9 @@ export default function MemoryDetailScreen() {
     );
   }
 
-  const toggle = async (patch: { pinned: boolean } | { favorite: boolean }) => {
-    if (busy) return;
+  const toggle = (patch: { pinned: boolean } | { favorite: boolean }) => once(() => toggleNow(patch));
+
+  const toggleNow = async (patch: { pinned: boolean } | { favorite: boolean }) => {
     setBusy(true);
     try {
       await memoryActions.update(memory.id, patch);
@@ -102,7 +106,7 @@ export default function MemoryDetailScreen() {
                 active={memory.favorite}
                 onPress={() => toggle({ favorite: !memory.favorite })}
               />
-              <IconButton icon="edit" label="Edit" onPress={() => router.push(routes.editMemory(memory.id))} />
+              <IconButton icon="edit" label="Edit" onPress={() => pushOnce(routes.editMemory(memory.id))} />
               <IconButton icon="delete" label="Delete" onPress={() => setConfirmDelete(true)} />
             </>
           }
@@ -151,11 +155,11 @@ export default function MemoryDetailScreen() {
               label={collection.name}
               icon="collection"
               selected
-              onPress={() => router.push(routes.collection(collection.id))}
+              onPress={() => pushOnce(routes.collection(collection.id))}
             />
           )}
           {memory.tags.map((t) => (
-            <Chip key={t} label={t} onPress={() => router.push(routes.searchResults({ tag: t }))} />
+            <Chip key={t} label={t} onPress={() => pushOnce(routes.searchResults({ tag: t }))} />
           ))}
         </View>
       )}
@@ -186,7 +190,7 @@ export default function MemoryDetailScreen() {
         message="You’ll be able to undo this for a few seconds."
         confirmLabel="Delete"
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={async () => {
+        onConfirm={() => once(async () => {
           setConfirmDelete(false);
           try {
             await deleteMemoryWithUndo(memory.id, toast);
@@ -194,7 +198,7 @@ export default function MemoryDetailScreen() {
           } catch (e) {
             toast.show(describeError(e, 'Couldn’t delete. Please try again.'), 'error');
           }
-        }}
+        })}
       />
     </Screen>
   );

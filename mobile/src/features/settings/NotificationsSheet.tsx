@@ -6,6 +6,7 @@ import { toNotificationSettings } from '@/api/mappers';
 import { ErrorState, Sheet, Skeleton, Switch, Text, useToast } from '@/components/ui';
 import { describeError } from '@/data/errors';
 import type { NotificationSettings } from '@/data/types';
+import { useSingleFlight } from '@/lib/single-flight';
 import { spacing } from '@/theme';
 
 const deviceTimezone = () => {
@@ -30,6 +31,7 @@ function NotificationsForm() {
   const [settings, setSettings] = useState<NotificationSettings>();
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
+  const once = useSingleFlight();
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
@@ -44,8 +46,10 @@ function NotificationsForm() {
     return () => controller.abort();
   }, [attempt]);
 
-  const toggle = async (remindersEnabled: boolean) => {
-    if (saving || !settings) return;
+  const toggle = (remindersEnabled: boolean) => once(() => toggleNow(remindersEnabled));
+
+  const toggleNow = async (remindersEnabled: boolean) => {
+    if (!settings) return;
     setSaving(true);
     try {
       // The server is the source of truth: the switch moves only once it confirms.

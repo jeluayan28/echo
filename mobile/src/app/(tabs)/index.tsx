@@ -1,4 +1,4 @@
-import { router, useFocusEffect } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { useCallback } from 'react';
 
 import { SectionHeader } from '@/components/layout';
@@ -12,6 +12,7 @@ import { QuickCapture } from '@/features/core/QuickCapture';
 import { RecentConnections } from '@/features/core/RecentConnections';
 import { RediscoverSection } from '@/features/core/RediscoverSection';
 import { StatusPanel } from '@/features/core/StatusPanel';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 
 /**
@@ -65,7 +66,7 @@ export default function MemoryCoreScreen() {
           title="Your core is empty"
           message="Capture your first thought above. Notes, ideas, links and voice memos all gather here."
           actionLabel="Write a note"
-          onAction={() => router.push(routes.newMemory('note'))}
+          onAction={() => pushOnce(routes.newMemory('note'))}
         />
       )}
 

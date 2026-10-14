@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
 import { View } from 'react-native';
 
 import { EmptyState, MemoryCard } from '@/components/ui';
 import type { Memory } from '@/data/types';
 import { formatDuration, formatRelative } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { spacing } from '@/theme';
 
@@ -67,7 +67,7 @@ export function MemoryList({
           favorite={m.favorite}
           pinned={m.pinned}
           linkCount={m.linkedIds.length}
-          onPress={() => router.push(routes.memory(m.id))}
+          onPress={() => pushOnce(routes.memory(m.id))}
         />
       ))}
     </View>

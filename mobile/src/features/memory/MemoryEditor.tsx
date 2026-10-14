@@ -10,6 +10,7 @@ import { useCollections, useTags } from '@/data/hooks';
 import type { Memory, MemoryType } from '@/data/types';
 import { LIMITS, hasErrors } from '@/data/validation';
 import { deleteLocalFile } from '@/lib/files';
+import { createSingleFlight } from '@/lib/single-flight';
 import { useSafeBack } from '@/navigation/use-safe-back';
 import { colors, radius, spacing } from '@/theme';
 
@@ -36,7 +37,7 @@ function describeFailure(e: unknown): SaveProblem {
       message:
         e.reason === 'interrupted'
           ? 'The upload was interrupted. Your recording and notes are still here — check your connection and try again.'
-          : 'Couldn’t upload the recording. It’s still here — try again.',
+          : `${(e.cause as { message?: string } | undefined)?.message ?? 'Couldn’t upload the recording.'} It’s still here.`,
     };
   }
   // `cause` is the underlying ApiError/NetworkError: say what really happened (offline, validation, rate limit).
@@ -66,6 +67,7 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
   const [pendingLeave, setPendingLeave] = useState<{ dispatch: () => void }>();
 
   const abort = useRef<AbortController | null>(null);
+  const once = useRef(createSingleFlight()).current;
   const allowLeave = useRef(false);
   const busy = saving !== 'idle';
 
@@ -106,8 +108,9 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
   };
 
   // ── save ─────────────────────────────────────────────────────────────────
-  const save = async () => {
-    if (busy) return; // ignore double taps
+  const save = () => once(saveNow);
+
+  const saveNow = async () => {
     setProblem(undefined);
     if (hasErrors(form.validate())) return;
 

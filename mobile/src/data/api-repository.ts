@@ -78,6 +78,11 @@ async function refreshLinks() {
 
 const isStatus = (e: unknown, status: number) => e instanceof ApiError && e.status === status;
 
+/** The server says a memory no longer exists (deleted on another device): forget it here too. */
+function forgetIfGone(epoch: number, id: string, error: unknown) {
+  if (isStatus(error, 404)) applyIfCurrent(epoch, () => store.removeMemory(id));
+}
+
 // ── repository ──────────────────────────────────────────────────────────────
 
 export const apiRepository: EchoRepository = {
@@ -106,7 +111,13 @@ export const apiRepository: EchoRepository = {
 
   async loadMemory(id, { open = false, signal } = {}) {
     const epoch = store.epoch();
-    const dto = open ? await memoriesApi.openMemory(id, signal) : await memoriesApi.getMemory(id, signal);
+    let dto;
+    try {
+      dto = open ? await memoriesApi.openMemory(id, signal) : await memoriesApi.getMemory(id, signal);
+    } catch (e) {
+      forgetIfGone(epoch, id, e);
+      throw e;
+    }
     let memory = toMemory(dto);
     applyIfCurrent(epoch, () => {
       memory = applyDetail(dto);
@@ -135,7 +146,13 @@ export const apiRepository: EchoRepository = {
       const current = store.getState().memories.find((m) => m.id === id);
       const payload = toMemoryPayload(patch, { creating: false, currentAttachmentId: current?.attachment?.id });
       if (Object.keys(payload).length === 0) return;
-      const dto = await memoriesApi.updateMemory(id, payload);
+      let dto;
+      try {
+        dto = await memoriesApi.updateMemory(id, payload);
+      } catch (e) {
+        forgetIfGone(epoch, id, e);
+        throw e;
+      }
       applyIfCurrent(epoch, () => {
         applyDetail(dto);
       });
@@ -146,7 +163,11 @@ export const apiRepository: EchoRepository = {
   deleteMemory(id) {
     return serial(`memory:${id}`, async () => {
       const epoch = store.epoch();
-      await memoriesApi.deleteMemory(id);
+      try {
+        await memoriesApi.deleteMemory(id);
+      } catch (e) {
+        if (!isStatus(e, 404)) throw e; // already deleted elsewhere: the goal is met
+      }
       applyIfCurrent(epoch, () => store.removeMemory(id));
       void refreshTags();
     });

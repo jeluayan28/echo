@@ -1,8 +1,8 @@
-import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { PressableScale, Text } from '@/components/ui';
 import { greetingFor } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, hitTarget, radius, spacing } from '@/theme';
 
@@ -29,7 +29,7 @@ export function DashboardTopBar({ name }: { name: string }) {
     <View style={styles.bar}>
       <Wordmark />
       <PressableScale
-        onPress={() => router.push(routes.settings)}
+        onPress={() => pushOnce(routes.settings)}
         accessibilityRole="button"
         accessibilityLabel="Profile and settings"
         style={styles.avatar}
@@ -46,8 +46,9 @@ export function DashboardTopBar({ name }: { name: string }) {
 export function Greeting({ name }: { name: string }) {
   return (
     <View style={styles.greeting}>
-      <Text variant="title">
-        {greetingFor()}, {name}
+      {/* Before the profile loads the name is empty: no dangling comma. Long names wrap instead of overflowing. */}
+      <Text variant="title" numberOfLines={2}>
+        {name.trim() ? `${greetingFor()}, ${name.trim()}` : greetingFor()}
       </Text>
       <Text variant="body" tone="muted">
         What’s on your mind?

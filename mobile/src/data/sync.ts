@@ -58,7 +58,7 @@ export function runSync(kind: 'initial' | 'retry' | 'refresh'): Promise<boolean>
       return false;
     })
     .finally(() => {
-      inFlight = null;
+      if (inFlight === run) inFlight = null;
     });
   inFlight = run;
   return run;

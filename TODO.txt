@@ -1,0 +1,52 @@
+ECHO - TO DO LIST
+=================
+Updated: 2026-10-14
+
+WHERE YOU ARE
+-------------
+The mobile app is connected to the Laravel API. No sample data is left.
+Verified by tests: backend 176 tests, mobile 228 tests, plus a 19-step live test against a running API and PostgreSQL.
+NOT verified: running the UI on a phone, an emulator or a browser.
+
+HOW TO RUN IT
+-------------
+- API for a phone:  cd backend ; php artisan serve --host=0.0.0.0 --port=8000
+- App:              cd mobile ; npx expo start
+- Mobile tests:     cd mobile ; npm test
+- Live API test:    cd mobile ; ECHO_E2E_API=http://127.0.0.1:8000/api npx jest src/test-utils/live-api
+- Backend tests:    cd backend ; php artisan test
+- API URL config:   mobile/.env.example (dev finds your computer by itself; staging/production need https URLs)
+
+TO DO - DO FIRST
+----------------
+[ ] Real database: create Postgres DB "echo", set DB_PASSWORD in backend/.env, run: php artisan migrate
+[ ] Test the app on a real phone and on an emulator (nothing has been run on a device yet):
+      - register, log in, create/edit a memory, link, search, Neural Map, log out and back in
+      - voice recording + microphone permission, and a real upload (only tested with a mock so far)
+      - reminders / notification permission
+      - keyboard in forms, Android back button, iOS swipe with the "discard changes?" prompt
+[ ] Put the real staging and production API URLs in mobile/eas.json (currently REPLACE-WITH-... placeholders)
+
+TO DO - UNFINISHED FEATURES
+---------------------------
+[ ] Rediscovery snooze/dismiss: add an API endpoint + save it; today it lives on the device and resets on restart
+[ ] Settings: build Theme and Privacy (rows still say "Soon")
+[ ] Settings: password-change screen and delete-account screen (the API already supports both)
+[ ] Settings: notification quiet hours (API supports it, no UI)
+[ ] Search: infinite scroll (today it shows the best 200 matches, 4 pages of 50)
+[ ] Voice playback: refresh the signed audio link when it expires (links last 10 minutes; reopen the memory for now)
+
+TO DO - RELIABILITY / SCALE
+---------------------------
+[ ] Sync: load only what changed (API has updated_since) instead of every memory on sign-in.
+    Fine for thousands of memories, not for very large accounts
+[ ] Offline: keep a copy of the data across app restarts
+[ ] Offline: queue writes made without a connection (today an offline save fails with a clear message
+    and keeps what you typed)
+
+TO DO - BEFORE RELEASE
+----------------------
+[ ] Move voice files to S3-compatible storage (ECHO_ATTACHMENT_DISK=s3)
+[ ] Production .env: HTTPS API, rotate any secrets, TRUSTED_PROXIES, CORS origins
+[ ] Accessibility check with a screen reader (TalkBack / VoiceOver)
+[ ] Build with EAS (development build for audio/notifications, then store builds)

@@ -10,6 +10,8 @@ import { DataGate } from '@/features/sync/DataGate';
 import { usePullRefresh } from '@/lib/use-pull-refresh';
 import { MemoryList } from '@/features/memory/MemoryList';
 import { pluralize } from '@/lib/format';
+import { useSingleFlight } from '@/lib/single-flight';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
 
@@ -20,6 +22,7 @@ export default function CollectionDetailScreen() {
   const collection = useCollection(id);
   const memories = useFilteredMemories({ collectionId: id });
   const { onRefresh, refreshing } = usePullRefresh();
+  const once = useSingleFlight();
   const [renaming, setRenaming] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -67,7 +70,7 @@ export default function CollectionDetailScreen() {
         emptyTitle="This collection is empty"
         emptyMessage="Capture a memory straight into it, or add existing ones by editing them and choosing this collection."
         emptyActionLabel="Add a memory"
-        onEmptyAction={() => router.push(routes.newMemory(undefined, collection.id))}
+        onEmptyAction={() => pushOnce(routes.newMemory(undefined, collection.id))}
       />
 
       <CollectionSheet visible={renaming} onClose={() => setRenaming(false)} collection={collection} />
@@ -83,7 +86,7 @@ export default function CollectionDetailScreen() {
         }
         confirmLabel="Delete collection"
         onCancel={() => setConfirmDelete(false)}
-        onConfirm={async () => {
+        onConfirm={() => once(async () => {
           setConfirmDelete(false);
           try {
             await collectionActions.remove(collection.id);
@@ -94,7 +97,7 @@ export default function CollectionDetailScreen() {
           } catch (e) {
             toast.show(describeError(e, 'Couldn’t delete the collection. Please try again.'), 'error');
           }
-        }}
+        })}
       />
     </Screen>
   );

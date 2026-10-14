@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Button, Chip, Icon, IconButton, Sheet, Text, useToast } from '@/components/ui';
 import { memoryActions } from '@/data/hooks';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, radius, spacing } from '@/theme';
 
@@ -70,7 +70,7 @@ export function SuggestionCard({ suggestion, compact = false }: SuggestionCardPr
       ) : null}
 
       <View style={styles.actions}>
-        <Button label="Open" onPress={() => router.push(routes.memory(memory.id))} />
+        <Button label="Open" onPress={() => pushOnce(routes.memory(memory.id))} />
         <View style={{ flex: 1 }} />
         <IconButton
           icon="favorite"

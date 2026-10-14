@@ -6,9 +6,9 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import { router } from 'expo-router';
 
 import { reminderRecords } from '@/data/hooks';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 
 import type { PermissionState } from './logic';
@@ -75,7 +75,7 @@ export function installNotificationHandling(): () => void {
 
   const open = (response: Notifications.NotificationResponse | null) => {
     const memoryId = response?.notification.request.content.data?.memoryId;
-    if (typeof memoryId === 'string') router.push(routes.memory(memoryId));
+    if (typeof memoryId === 'string') pushOnce(routes.memory(memoryId));
   };
 
   // App launched by tapping a notification.

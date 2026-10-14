@@ -159,6 +159,11 @@ async function once(method: Method, path: string, options: RequestOptions): Prom
     json = undefined; // an HTML error page from a proxy, an empty body, …
   }
 
+  // A 2xx that isn't our JSON is a captive-portal / proxy page, not the API: never treat it as data.
+  if (response.ok && json === undefined) {
+    throw new NetworkError('ECHO sent an unexpected response. Check your connection (or sign in to the Wi-Fi) and try again.');
+  }
+
   if (!response.ok) {
     const retryAfter = Number(response.headers.get('Retry-After')) || undefined;
     const error = parseErrorBody(response.status, json, retryAfter);

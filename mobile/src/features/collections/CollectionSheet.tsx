@@ -7,6 +7,7 @@ import { collectionActions } from '@/data/hooks';
 import { describeError } from '@/data/errors';
 import type { Collection } from '@/data/types';
 import { LIMITS, hasErrors, validateCollection, type CollectionErrors } from '@/data/validation';
+import { useSingleFlight } from '@/lib/single-flight';
 import { spacing } from '@/theme';
 
 export type CollectionSheetProps = {
@@ -36,9 +37,11 @@ function CollectionForm({ collection, onClose, onSaved }: Omit<CollectionSheetPr
   const [description, setDescription] = useState(collection?.description ?? '');
   const [errors, setErrors] = useState<CollectionErrors>({});
   const [saving, setSaving] = useState(false);
+  const once = useSingleFlight();
 
-  const submit = async () => {
-    if (saving) return;
+  const submit = () => once(submitNow);
+
+  const submitNow = async () => {
     const next = validateCollection({ name, description });
     setErrors(next);
     if (hasErrors(next)) return;

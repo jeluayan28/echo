@@ -5,7 +5,7 @@
  */
 import { Platform } from 'react-native';
 
-import { UploadError } from '@/data/errors';
+import { UploadError, friendlyFieldError } from '@/data/errors';
 import type { LocalFile } from '@/data/types';
 
 import { buildUrl, getAuthToken, notifyUnauthorized, parseErrorBody } from '../client';
@@ -62,7 +62,7 @@ export async function uploadAttachment(file: LocalFile, { onProgress, signal }: 
       }
       if (xhr.status === 401) notifyUnauthorized();
       const error = parseErrorBody(xhr.status, json);
-      reject(new UploadError('failed', error.fieldErrors.file ?? error.message));
+      reject(new UploadError('failed', error.fieldErrors.file ? friendlyFieldError('file', error.fieldErrors.file) : error.message));
     };
     xhr.onerror = () => {
       cleanup();

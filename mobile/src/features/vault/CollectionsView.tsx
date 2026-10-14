@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { View } from 'react-native';
 
 import { Button, CollectionCard, EmptyState } from '@/components/ui';
 import type { Collection, Memory } from '@/data/types';
 import { CollectionSheet } from '@/features/collections/CollectionSheet';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { spacing } from '@/theme';
 
@@ -32,7 +32,7 @@ export function CollectionsView({ collections, memories }: { collections: Collec
               name={c.name}
               description={c.description}
               memoryCount={memories.filter((m) => m.collectionId === c.id).length}
-              onPress={() => router.push(routes.collection(c.id))}
+              onPress={() => pushOnce(routes.collection(c.id))}
             />
           ))}
         </View>

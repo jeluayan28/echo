@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { ScreenHeader } from '@/components/layout';
 import { EmptyState, ErrorState, IconButton, Screen, SearchBar, Text } from '@/components/ui';
 import { pluralize } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { GraphCanvas, type GraphCanvasHandle } from '@/features/map/GraphCanvas';
 import { GraphListView } from '@/features/map/GraphListView';
@@ -42,7 +42,7 @@ export default function NeuralMapScreen() {
     return () => clearTimeout(t);
   }, [focusId, mode]);
 
-  const openMemory = useCallback((id: string) => router.push(routes.memory(id)), []);
+  const openMemory = useCallback((id: string) => pushOnce(routes.memory(id)), []);
   const selectAndFocus = useCallback(
     (id: string) => {
       map.select(id);
@@ -94,7 +94,7 @@ export default function NeuralMapScreen() {
         title="Nothing to map yet"
         message="Capture a few memories, then link the ones that belong together. They appear here."
         actionLabel="Capture a memory"
-        onAction={() => router.push(routes.newMemory())}
+        onAction={() => pushOnce(routes.newMemory())}
       />
     );
   } else if (map.graph.nodes.length === 0) {

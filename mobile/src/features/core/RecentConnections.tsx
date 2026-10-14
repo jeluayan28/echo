@@ -1,10 +1,10 @@
-import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { ListRow } from '@/components/layout';
 import { Icon, Text } from '@/components/ui';
 import type { useConnections } from '@/data/hooks';
 import { formatRelative } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, radius, spacing } from '@/theme';
 
@@ -31,7 +31,7 @@ export function RecentConnections({ connections }: { connections: Connection[] }
           icon="link"
           title={from.title}
           subtitle={`Linked to ${to.title} · ${formatRelative(link.createdAt)}`}
-          onPress={() => router.push(routes.memory(from.id))}
+          onPress={() => pushOnce(routes.memory(from.id))}
         />
       ))}
     </View>

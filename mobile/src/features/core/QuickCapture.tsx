@@ -1,8 +1,8 @@
-import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Icon, PressableScale, Text, type IconName } from '@/components/ui';
 import type { MemoryType } from '@/data/types';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, radius, spacing } from '@/theme';
 
@@ -20,7 +20,7 @@ export function QuickCapture() {
       {actions.map((a) => (
         <PressableScale
           key={a.type}
-          onPress={() => router.push(routes.newMemory(a.type))}
+          onPress={() => pushOnce(routes.newMemory(a.type))}
           accessibilityRole="button"
           accessibilityLabel={a.a11y}
           style={styles.tile}

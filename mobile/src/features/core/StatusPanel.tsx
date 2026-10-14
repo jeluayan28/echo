@@ -1,9 +1,9 @@
-import { router } from 'expo-router';
 import { StyleSheet, View } from 'react-native';
 
 import { Icon, PressableScale, Text } from '@/components/ui';
 import type { Memory } from '@/data/types';
 import { formatActivity } from '@/lib/format';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors, radius, spacing } from '@/theme';
 
@@ -25,7 +25,7 @@ export function StatusPanel({ memoryCount, collectionCount, recentlyUpdated }: S
 
       {recentlyUpdated && (
         <PressableScale
-          onPress={() => router.push(routes.memory(recentlyUpdated.id))}
+          onPress={() => pushOnce(routes.memory(recentlyUpdated.id))}
           accessibilityRole="button"
           accessibilityLabel={`Last updated: ${recentlyUpdated.title}, ${formatActivity(recentlyUpdated.updatedAt)}`}
           pressedScale={0.99}

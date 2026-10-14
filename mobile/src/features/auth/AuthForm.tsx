@@ -6,6 +6,7 @@ import { clearNotice, signIn, signUp, useSession } from '@/auth/session';
 import { Button, Text, TextField } from '@/components/ui';
 import { ApiError, ConfigError } from '@/api/client';
 import { describeError } from '@/data/errors';
+import { useSingleFlight } from '@/lib/single-flight';
 import { routes } from '@/navigation/routes';
 import { spacing } from '@/theme';
 
@@ -22,6 +23,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function AuthForm({ mode }: { mode: Mode }) {
   const { notice } = useSession();
   const [busy, setBusy] = useState(false);
+  const once = useSingleFlight();
   const [formError, setFormError] = useState<string>();
   const isRegister = mode === 'register';
 
@@ -37,8 +39,9 @@ export function AuthForm({ mode }: { mode: Mode }) {
 
   const clear = (key: keyof Errors) => errors[key] && setErrors((e) => ({ ...e, [key]: undefined }));
 
-  const submit = async () => {
-    if (busy) return; // ignore double taps while the request is in flight
+  const submit = () => once(submitNow);
+
+  const submitNow = async () => {
     setFormError(undefined);
     clearNotice();
     const next: Errors = {};

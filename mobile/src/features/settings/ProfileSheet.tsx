@@ -9,6 +9,7 @@ import { Button, Sheet, TextField, useToast } from '@/components/ui';
 import { describeError } from '@/data/errors';
 import { store } from '@/data/store';
 import type { Profile } from '@/data/types';
+import { useSingleFlight } from '@/lib/single-flight';
 import { spacing } from '@/theme';
 
 type Errors = Partial<Record<'name' | 'email' | 'password', string>>;
@@ -30,11 +31,13 @@ function ProfileForm({ profile, onClose }: { profile: Profile; onClose: () => vo
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState<Errors>({});
   const [saving, setSaving] = useState(false);
+  const once = useSingleFlight();
 
   const emailChanged = email.trim().toLowerCase() !== (profile.email ?? '').toLowerCase();
 
-  const submit = async () => {
-    if (saving) return;
+  const submit = () => once(submitNow);
+
+  const submitNow = async () => {
     const next: Errors = {};
     if (!name.trim()) next.name = 'Enter your name.';
     if (!EMAIL.test(email.trim())) next.email = 'Enter a valid email address.';

@@ -4,6 +4,7 @@ import { Linking, Platform, StyleSheet, View } from 'react-native';
 import { Button, Icon, Sheet, Text, useToast } from '@/components/ui';
 import { useReminder } from '@/data/hooks';
 import type { Memory } from '@/data/types';
+import { useSingleFlight } from '@/lib/single-flight';
 import { colors, radius, spacing } from '@/theme';
 
 import { DELIVERY_COPY, isDue, reminderPresets } from './logic';
@@ -32,8 +33,12 @@ export function ReminderSection({ memory }: { memory: Memory }) {
   const reminder = useReminder(memory.id);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const once = useSingleFlight();
 
-  const choose = async (date: Date) => {
+  const choose = (date: Date) => once(() => chooseNow(date));
+  const remove = () => once(removeNow);
+
+  const chooseNow = async (date: Date) => {
     setBusy(true);
     try {
       const result = await reminderService.setReminder({ memoryId: memory.id, title: memory.title, fireAt: date });
@@ -48,7 +53,7 @@ export function ReminderSection({ memory }: { memory: Memory }) {
     }
   };
 
-  const remove = async () => {
+  const removeNow = async () => {
     setBusy(true);
     try {
       const result = await reminderService.cancelReminder(memory.id);

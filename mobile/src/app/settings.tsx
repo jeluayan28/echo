@@ -1,5 +1,4 @@
 import Constants from 'expo-constants';
-import { router } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
@@ -9,8 +8,10 @@ import { Button, ConfirmDialog, Icon, Screen, Text, useToast } from '@/component
 import { useProfile } from '@/data/hooks';
 import { NotificationsSheet } from '@/features/settings/NotificationsSheet';
 import { ProfileSheet } from '@/features/settings/ProfileSheet';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { useSafeBack } from '@/navigation/use-safe-back';
+import { useSingleFlight } from '@/lib/single-flight';
 import { colors, radius, spacing } from '@/theme';
 
 /**
@@ -25,6 +26,7 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const once = useSingleFlight();
 
   return (
     <Screen scroll edges={['top', 'bottom']} header={<ScreenHeader title="Settings" onBack={goBack} />}>
@@ -58,7 +60,7 @@ export default function SettingsScreen() {
             icon="settings"
             title="Design system"
             subtitle="Component gallery"
-            onPress={() => router.push(routes.designSystem)}
+            onPress={() => pushOnce(routes.designSystem)}
           />
         </>
       )}
@@ -75,7 +77,7 @@ export default function SettingsScreen() {
         message="Your memories stay safe in your account. They’re removed from this device until you sign in again."
         confirmLabel="Sign out"
         onCancel={() => setConfirmSignOut(false)}
-        onConfirm={async () => {
+        onConfirm={() => once(async () => {
           setConfirmSignOut(false);
           setSigningOut(true);
           try {
@@ -84,7 +86,7 @@ export default function SettingsScreen() {
             setSigningOut(false);
             toast.show('Couldn’t sign out. Please try again.', 'error');
           }
-        }}
+        })}
       />
     </Screen>
   );

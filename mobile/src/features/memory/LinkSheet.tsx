@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 
 import { Checkbox, Sheet, Text, useToast } from '@/components/ui';
@@ -21,8 +21,11 @@ export function LinkSheet({ memory, visible, onClose }: LinkSheetProps) {
   // Ids with a request in flight: their checkbox ignores taps until the server answers.
   const [pending, setPending] = useState<ReadonlySet<string>>(new Set());
 
+  const inFlight = useRef(new Set<string>()); // a ref, so two taps in one frame can't both pass
+
   const toggle = async (other: Memory, next: boolean) => {
-    if (pending.has(other.id)) return;
+    if (inFlight.current.has(other.id)) return;
+    inFlight.current.add(other.id);
     setPending((p) => new Set(p).add(other.id));
     try {
       if (next) await memoryActions.link(memory.id, other.id);
@@ -30,6 +33,7 @@ export function LinkSheet({ memory, visible, onClose }: LinkSheetProps) {
     } catch (e) {
       toast.show(describeError(e, 'Couldn’t update the link. Please try again.'), 'error');
     } finally {
+      inFlight.current.delete(other.id);
       setPending((p) => {
         const n = new Set(p);
         n.delete(other.id);

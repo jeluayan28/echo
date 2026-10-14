@@ -101,7 +101,9 @@ export const store = {
     reminders: Reminder[];
   }) {
     const byId = new Map(state.memories.map((m) => [m.id, m]));
-    const memories = data.memories.map((m) => mergeMemory(byId.get(m.id), m));
+    // Paging a list that changes underneath us can return the same row twice; keep one.
+    const unique = [...new Map(data.memories.map((m) => [m.id, m])).values()];
+    const memories = unique.map((m) => mergeMemory(byId.get(m.id), m));
     const alive = new Set(memories.map((m) => m.id));
     const remindersById: Record<string, Reminder> = {};
     for (const r of data.reminders) if (alive.has(r.memoryId)) remindersById[r.memoryId] = r;
@@ -109,9 +111,9 @@ export const store = {
     const rediscovery = Object.fromEntries(Object.entries(state.rediscovery).filter(([id]) => alive.has(id)));
     setState({
       profile: data.profile ?? state.profile,
-      memories: withLinkedIds(memories, data.links),
-      collections: data.collections,
-      links: data.links,
+      memories: withLinkedIds(memories, [...new Map(data.links.map((l) => [l.id, l])).values()]),
+      collections: [...new Map(data.collections.map((c) => [c.id, c])).values()],
+      links: [...new Map(data.links.map((l) => [l.id, l])).values()],
       tags: data.tags,
       reminders: remindersById,
       rediscovery,

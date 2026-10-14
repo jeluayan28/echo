@@ -1,7 +1,7 @@
-import { router } from 'expo-router';
 import { TabList, TabSlot, TabTrigger, Tabs } from 'expo-router/ui';
 
 import { CaptureTabButton, TabBarButton, useTabBarStyle } from '@/components/ui';
+import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
 import { colors } from '@/theme';
 
@@ -24,7 +24,7 @@ export default function TabsLayout() {
           <TabBarButton label="Map" icon="map" />
         </TabTrigger>
         <TabTrigger name="capture" href="/capture" asChild>
-          <CaptureTabButton onPress={() => router.push(routes.newMemory())} />
+          <CaptureTabButton onPress={() => pushOnce(routes.newMemory())} />
         </TabTrigger>
         <TabTrigger name="search" href="/search" asChild>
           <TabBarButton label="Search" icon="search" />
