@@ -17,22 +17,28 @@ import {
   sortNewest,
   type MemoryFilter,
 } from './selectors';
-import { store } from './store';
+import { store, type State } from './store';
 import { runSync, useSyncStatus } from './sync';
 import type { Collection, Link, Memory, Profile, Reminder, TagCount } from './types';
 
-function useStoreState() {
-  return useSyncExternalStore(store.subscribe, store.getState, store.getState);
+/**
+ * Subscribes to ONE slice of the cache. The selector must return a value that keeps its identity until that
+ * slice really changes (an array/record from the state, or a primitive), so a component re-renders only for
+ * the data it reads — not for every unrelated store update.
+ */
+function useStore<T>(select: (state: State) => T): T {
+  const get = () => select(store.getState());
+  return useSyncExternalStore(store.subscribe, get, get);
 }
 
 /** All memories, newest first. */
 export function useMemories(): Memory[] {
-  const { memories } = useStoreState();
+  const memories = useStore((s) => s.memories);
   return useMemo(() => sortNewest(memories), [memories]);
 }
 
 export function useFilteredMemories(filter: MemoryFilter): Memory[] {
-  const { memories } = useStoreState();
+  const memories = useStore((s) => s.memories);
   const { query, type, tag, favoritesOnly, untaggedOnly, collectionId } = filter;
   return useMemo(
     () => filterMemories(memories, { query, type, tag, favoritesOnly, untaggedOnly, collectionId }),
@@ -41,26 +47,26 @@ export function useFilteredMemories(filter: MemoryFilter): Memory[] {
 }
 
 export function useMemory(id: string | undefined): Memory | undefined {
-  const { memories } = useStoreState();
+  const memories = useStore((s) => s.memories);
   return useMemo(() => memories.find((m) => m.id === id), [memories, id]);
 }
 
 export function useCollections(): Collection[] {
-  return useStoreState().collections;
+  return useStore((s) => s.collections);
 }
 
 export function useCollection(id: string | undefined): Collection | undefined {
-  const { collections } = useStoreState();
+  const collections = useStore((s) => s.collections);
   return useMemo(() => collections.find((c) => c.id === id), [collections, id]);
 }
 
 export function useProfile(): Profile {
-  return useStoreState().profile;
+  return useStore((s) => s.profile);
 }
 
 /** Tags with their live-memory counts, most used first (from the server). */
 export function useTags(): TagCount[] {
-  return useStoreState().tags;
+  return useStore((s) => s.tags);
 }
 
 export type MemoryDetailStatus = 'loading' | 'ready' | 'error' | 'notFound';
@@ -95,18 +101,18 @@ export function useMemoryDetail(id: string | undefined, { open = false }: { open
 
 /** Connections (user-created links) between existing memories, newest first. */
 export function useConnections() {
-  const { memories, links } = useStoreState();
+  const memories = useStore((s) => s.memories);
+  const links = useStore((s) => s.links);
   return useMemo(() => connectionPairs(memories, links), [memories, links]);
 }
 
 /** Raw links (relationships between memories), for building the Neural Map graph. */
 export function useLinks(): Link[] {
-  return useStoreState().links;
+  return useStore((s) => s.links);
 }
 
 export function useReminder(memoryId: string | undefined): Reminder | undefined {
-  const { reminders } = useStoreState();
-  return memoryId ? reminders[memoryId] : undefined;
+  return useStore((s) => (memoryId ? s.reminders[memoryId] : undefined));
 }
 
 /**
@@ -115,7 +121,9 @@ export function useReminder(memoryId: string | undefined): Reminder | undefined 
  * snooze/dismiss decisions change.
  */
 export function useSuggestions(options: { contextId?: string; limit?: number; kinds?: SuggestionKind[] } = {}) {
-  const { memories, reminders, rediscovery } = useStoreState();
+  const memories = useStore((s) => s.memories);
+  const reminders = useStore((s) => s.reminders);
+  const rediscovery = useStore((s) => s.rediscovery);
   const { contextId, limit, kinds } = options;
   const kindsKey = kinds?.join(',');
   return useMemo(
@@ -163,7 +171,12 @@ export type DashboardStatus = 'loading' | 'ready' | 'error';
  */
 export function useDashboard() {
   const sync = useSyncStatus();
-  const { memories, collections, links, rediscovery, reminders, profile } = useStoreState();
+  const memories = useStore((s) => s.memories);
+  const collections = useStore((s) => s.collections);
+  const links = useStore((s) => s.links);
+  const rediscovery = useStore((s) => s.rediscovery);
+  const reminders = useStore((s) => s.reminders);
+  const profile = useStore((s) => s.profile);
   const status: DashboardStatus = sync.status === 'ready' ? 'ready' : sync.status === 'error' ? 'error' : 'loading';
   const run = useCallback((kind: 'initial' | 'retry' | 'refresh') => runSync(kind), []);
 

@@ -53,7 +53,11 @@ function setState(next: State) {
 /** Recompute every memory's `linkedIds` from the link list, so the two can never disagree. */
 export function withLinkedIds(memories: Memory[], links: Link[]): Memory[] {
   const byMemory = new Map<string, string[]>();
-  const add = (a: string, b: string) => byMemory.set(a, [...(byMemory.get(a) ?? []), b]);
+  const add = (a: string, b: string) => {
+    const list = byMemory.get(a);
+    if (list) list.push(b);
+    else byMemory.set(a, [b]);
+  };
   for (const l of links) {
     add(l.fromId, l.toId);
     add(l.toId, l.fromId);
