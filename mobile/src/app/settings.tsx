@@ -6,7 +6,9 @@ import { ListRow, ScreenHeader, SectionHeader } from '@/components/layout';
 import { signOut } from '@/auth/session';
 import { Button, ConfirmDialog, Icon, Screen, Text, useToast } from '@/components/ui';
 import { useProfile } from '@/data/hooks';
+import { canSearchByMeaning, statusOf, useSemanticState } from '@/features/semantic/status';
 import { NotificationsSheet } from '@/features/settings/NotificationsSheet';
+import { SemanticSearchSheet } from '@/features/settings/SemanticSearchSheet';
 import { ProfileSheet } from '@/features/settings/ProfileSheet';
 import { pushOnce } from '@/navigation/push-once';
 import { routes } from '@/navigation/routes';
@@ -24,6 +26,8 @@ export default function SettingsScreen() {
   const profile = useProfile();
   const [editing, setEditing] = useState(false);
   const [notifications, setNotifications] = useState(false);
+  const [semanticOpen, setSemanticOpen] = useState(false);
+  const semantic = statusOf(useSemanticState());
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const once = useSingleFlight();
@@ -51,6 +55,12 @@ export default function SettingsScreen() {
         <ListRow icon="eye" title="Theme" subtitle="Appearance" comingSoon />
         <ListRow icon="lock" title="Privacy" subtitle="App lock and data" comingSoon />
         <ListRow icon="bell" title="Notifications" subtitle="Reminders" onPress={() => setNotifications(true)} />
+        <ListRow
+          icon="search"
+          title="Search by meaning"
+          subtitle={!semantic ? 'Checking…' : !semantic.available ? 'Not available' : canSearchByMeaning(semantic) ? 'On' : 'Off'}
+          onPress={() => setSemanticOpen(true)}
+        />
       </View>
 
       {__DEV__ && (
@@ -71,6 +81,7 @@ export default function SettingsScreen() {
 
       <ProfileSheet visible={editing} onClose={() => setEditing(false)} profile={profile} />
       <NotificationsSheet visible={notifications} onClose={() => setNotifications(false)} />
+      <SemanticSearchSheet visible={semanticOpen} onClose={() => setSemanticOpen(false)} />
       <ConfirmDialog
         visible={confirmSignOut}
         title="Sign out of ECHO?"

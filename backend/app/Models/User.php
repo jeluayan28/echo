@@ -24,6 +24,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'semantic_search_opt_in_at' => 'datetime',
+            'semantic_search_consent_version' => 'integer',
         ];
     }
 

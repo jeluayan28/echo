@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\ProfileController;
 use App\Http\Controllers\Api\V1\ReminderController;
 use App\Http\Controllers\Api\V1\SearchController;
+use App\Http\Controllers\Api\V1\SemanticSearchController;
 use App\Http\Controllers\Api\V1\TagController;
 use Illuminate\Support\Facades\Route;
 
@@ -34,6 +35,8 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::get('me', [ProfileController::class, 'show'])->name('me.show');
         Route::patch('me', [ProfileController::class, 'update'])->name('me.update');
         Route::delete('me', [ProfileController::class, 'destroy'])->name('me.destroy');
+        Route::get('me/semantic-search', [SemanticSearchController::class, 'show'])->name('me.semantic.show');
+        Route::patch('me/semantic-search', [SemanticSearchController::class, 'update'])->middleware('throttle:semantic-settings')->name('me.semantic.update');
         Route::get('me/preferences', [NotificationPreferenceController::class, 'show'])->name('me.preferences.show');
         Route::patch('me/preferences', [NotificationPreferenceController::class, 'update'])->name('me.preferences.update');
 

@@ -5,6 +5,7 @@ export * as tagsApi from './services/tags';
 export * as collectionsApi from './services/collections';
 export * as linksApi from './services/links';
 export * as searchApi from './services/search';
+export * as semanticApi from './services/semantic';
 export * as remindersApi from './services/reminders';
 export * as profileApi from './services/profile';
 export * as attachmentsApi from './services/attachments';

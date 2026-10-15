@@ -27,6 +27,17 @@ export type SearchRequest = {
   query: string;
   filters: SearchFilters;
   sort: SearchSort;
+  /** Ask for search by meaning. Only honoured when the server says it works; see `SearchOutcome`. */
+  semantic?: boolean;
+};
+
+/** How the search was really answered, so the UI never claims more than it delivered. */
+export type SearchOutcome = {
+  mode: 'text' | 'semantic';
+  /** False while the index is still being built (semantic results may be missing memories). */
+  complete: boolean;
+  /** Why a semantic search was answered with text search instead; null if it wasn't. */
+  fallbackReason: string | null;
 };
 
 export const emptyFilters = (): SearchFilters => ({ tags: [], favoritesOnly: false });
@@ -36,7 +47,7 @@ export const hasFilters = (f: SearchFilters) =>
 
 export type SearchHit = { memory: Memory; score: number };
 
-export type SearchContext = { collections: Collection[] };
+export type SearchContext = { collections: Collection[]; report?: (outcome: SearchOutcome) => void };
 
 export interface SearchProvider {
   id: string;

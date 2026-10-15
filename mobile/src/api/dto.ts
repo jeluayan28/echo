@@ -87,3 +87,27 @@ export type PreferencesDto = {
 };
 
 export type Envelope<T> = { data: T };
+
+/** What the server says about semantic search ("search by meaning") for this user. */
+export type SemanticStatusDto = {
+  /** True ONLY when the whole pipeline works end to end right now. */
+  available: boolean;
+  /** The user has opted in (to the current explanation). */
+  enabled: boolean;
+  state: 'unavailable' | 'off' | 'indexing' | 'ready';
+  reason: 'not_configured' | 'no_vector_store' | 'provider_down' | null;
+  processing: 'self-hosted' | 'external' | null;
+  provider: string | null;
+  /** The plain-language statement of what is sent where; null while nothing could be processed. */
+  disclosure: string | null;
+  consent_version: number;
+  indexed: number;
+  total: number;
+};
+
+/** How a search was ACTUALLY answered (it may differ from what was asked for). */
+export type SearchMetaDto = {
+  mode: 'text' | 'semantic';
+  complete: boolean;
+  fallback_reason: string | null;
+};

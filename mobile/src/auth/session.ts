@@ -13,6 +13,7 @@ import { store } from '@/data/store';
 import { resetSync, runSync } from '@/data/sync';
 import type { Profile } from '@/data/types';
 import { cancelAllReminderNotifications } from '@/features/reminders/notifications';
+import { resetSemanticStatus } from '@/features/semantic/status';
 import { recentSearches } from '@/features/search/history';
 
 import { clearSession, loadSession, saveSession } from './secure-storage';
@@ -55,6 +56,7 @@ async function wipeLocalData() {
   store.reset();
   resetSync();
   recentSearches.clear();
+  resetSemanticStatus();
   await Promise.allSettled([clearSession(), cancelAllReminderNotifications()]);
 }
 

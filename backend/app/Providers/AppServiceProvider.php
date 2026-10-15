@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Semantic\EmbeddingProvider;
+use App\Semantic\HttpEmbeddingProvider;
+use App\Semantic\SemanticConfig;
+use App\Semantic\SemanticSearch;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
@@ -13,7 +17,9 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        $this->app->singleton(SemanticConfig::class);
+        $this->app->bind(EmbeddingProvider::class, HttpEmbeddingProvider::class);
+        $this->app->singleton(SemanticSearch::class);
     }
 
     public function boot(): void
@@ -48,5 +54,9 @@ class AppServiceProvider extends ServiceProvider
         // Uploads and search are the expensive endpoints.
         RateLimiter::for('uploads', fn (Request $request) => Limit::perMinute(20)->by($request->user()?->id ?: $request->ip()));
         RateLimiter::for('search', fn (Request $request) => Limit::perMinute(60)->by($request->user()?->id ?: $request->ip()));
+
+        // Calls to the embedding service (a paid / shared resource), across all users, and the settings switch.
+        RateLimiter::for('embeddings', fn () => Limit::perMinute(max(1, (int) config('echo.semantic.requests_per_minute')))->by('embeddings'));
+        RateLimiter::for('semantic-settings', fn (Request $request) => Limit::perMinute(10)->by($request->user()?->id ?: $request->ip()));
     }
 }

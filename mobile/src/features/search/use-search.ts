@@ -3,11 +3,11 @@ import { useEffect, useMemo, useState } from 'react';
 import type { Collection, Memory } from '@/data/types';
 
 import { apiSearchProvider } from './api-provider';
-import { runSearch, type SearchHit, type SearchProvider, type SearchRequest } from './engine';
+import { runSearch, type SearchHit, type SearchOutcome, type SearchProvider, type SearchRequest } from './engine';
 
 export type SearchStatus = 'loading' | 'ready' | 'error';
 
-type Settled = { key: string; hits?: SearchHit[]; failed?: boolean };
+type Settled = { key: string; hits?: SearchHit[]; failed?: boolean; outcome?: SearchOutcome };
 
 // A module constant: a fresh `[lexicalProvider]` per render would re-trigger the effect forever.
 const DEFAULT_PROVIDERS: SearchProvider[] = [apiSearchProvider];
@@ -37,8 +37,8 @@ export function useSearch(
     [memories],
   );
   const key = useMemo(
-    () => JSON.stringify([request.query.trim(), request.filters, request.sort, attempt, dataVersion]),
-    [request.query, request.filters, request.sort, attempt, dataVersion],
+    () => JSON.stringify([request.query.trim(), request.filters, request.sort, !!request.semantic, attempt, dataVersion]),
+    [request.query, request.filters, request.sort, request.semantic, attempt, dataVersion],
   );
 
   const readsCache = providers.some((p) => p.local);
@@ -46,13 +46,14 @@ export function useSearch(
   useEffect(() => {
     if (!enabled) return;
     let cancelled = false;
+    let outcome: SearchOutcome | undefined;
     Promise.resolve()
       .then(() => {
         if (__DEV__ && (globalThis as DevGlobals).__ECHO_FAIL_SEARCH) throw new Error('Simulated search failure');
-        return runSearch(request, memories, { collections }, providers);
+        return runSearch(request, memories, { collections, report: (o) => (outcome = o) }, providers);
       })
       .then(
-        (hits) => !cancelled && setSettled({ key, hits }),
+        (hits) => !cancelled && setSettled({ key, hits, outcome }),
         () => !cancelled && setSettled({ key, failed: true }),
       );
     return () => {
@@ -67,6 +68,8 @@ export function useSearch(
   return {
     status,
     hits: settled?.hits ?? [],
+    /** How the CURRENT results were produced (only set for semantic requests). */
+    outcome: current ? settled.outcome : undefined,
     /** True when `hits` belong to an earlier request that is being replaced. */
     stale: !current && !!settled?.hits,
     retry: () => setAttempt((n) => n + 1),

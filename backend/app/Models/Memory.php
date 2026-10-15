@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\MemoryType;
+use App\Semantic\SemanticSearch;
 use App\Support\SearchTerms;
 use Database\Factories\MemoryFactory;
 use Illuminate\Database\Eloquent\Builder;
@@ -38,6 +39,32 @@ class Memory extends Model
 
     protected static function booted(): void
     {
+        // Optional semantic search: keep the vector in step with the memory (see App\Semantic). The server-level
+        // switch is checked first, so a deployment without the feature pays nothing, not even a query.
+        static::saved(function (Memory $memory) {
+            if (! config('echo.semantic.enabled')) {
+                return;
+            }
+            // Pinning, starring and opening change nothing a vector is made from.
+            $changed = array_keys($memory->getChanges());
+            if ($changed !== [] && array_diff($changed, ['favorite', 'pinned', 'last_opened_at', 'updated_at']) === []) {
+                return;
+            }
+            if (app(SemanticSearch::class)->shouldIndex($memory->user_id)) {
+                app(SemanticSearch::class)->queueEmbedding($memory->id, $memory->user_id);
+            }
+        });
+        static::deleted(function (Memory $memory) { // soft or hard: trashed memories must not be searchable
+            if (config('echo.semantic.enabled')) {
+                app(SemanticSearch::class)->forget($memory->id, $memory->user_id);
+            }
+        });
+        static::restored(function (Memory $memory) {
+            if (config('echo.semantic.enabled') && app(SemanticSearch::class)->shouldIndex($memory->user_id)) {
+                app(SemanticSearch::class)->queueEmbedding($memory->id, $memory->user_id);
+            }
+        });
+
         // A permanent delete must also remove the stored file: the database cascade only removes the row.
         static::forceDeleting(function (Memory $memory) {
             Attachment::query()->where('memory_id', $memory->id)->get()->each->deleteStoredFile();

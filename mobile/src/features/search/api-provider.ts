@@ -10,7 +10,7 @@ import { ApiError } from '@/api/client';
 import { toMemoryFromSummary } from '@/api/mappers';
 import { mergeMemory, store } from '@/data/store';
 
-import { applyFilters, lexicalProvider, tokenize, type SearchProvider } from './engine';
+import { applyFilters, lexicalProvider, tokenize, type SearchOutcome, type SearchProvider } from './engine';
 
 const PER_PAGE = 50;
 /** Search shows the best 200 matches; refining the query is better than paging through thousands. */
@@ -24,10 +24,12 @@ export const apiSearchProvider: SearchProvider = {
     const { filters } = request;
     const cache = new Map(store.getState().memories.map((m) => [m.id, m]));
     const memories = [];
+    let outcome: SearchOutcome | undefined;
     try {
       for (let page = 1; page <= MAX_PAGES; page++) {
         const res = await searchApi.searchMemories({
           q: request.query.trim().slice(0, 200),
+          mode: request.semantic ? 'semantic' : undefined,
           type: filters.type,
           collection_id: filters.collectionId,
           tag: filters.tags[0], // the API filters by one tag; the rest are applied below
@@ -35,6 +37,9 @@ export const apiSearchProvider: SearchProvider = {
           page,
           per_page: PER_PAGE,
         });
+        if (res.search && !outcome) {
+          outcome = { mode: res.search.mode, complete: res.search.complete, fallbackReason: res.search.fallback_reason };
+        }
         // Prefer what we already hold (full text, link ids) over the bare list row.
         memories.push(...res.data.map((dto) => mergeMemory(cache.get(dto.id), toMemoryFromSummary(dto))));
         if (page >= res.meta.last_page) break;
@@ -43,6 +48,11 @@ export const apiSearchProvider: SearchProvider = {
       // A query the server can't turn into search terms (only punctuation) simply matches nothing.
       if (e instanceof ApiError && e.isValidation) return [];
       throw e;
+    }
+
+    if (request.semantic) {
+      // If the server did not say how it answered, it did not do semantic search: never imply otherwise.
+      context.report?.(outcome ?? { mode: 'text', complete: true, fallbackReason: 'unknown' });
     }
 
     const matched = applyFilters(memories, filters);

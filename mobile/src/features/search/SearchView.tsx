@@ -17,6 +17,7 @@ import {
   Text,
 } from '@/components/ui';
 import { useCollections, useMemories, useTags } from '@/data/hooks';
+import { canSearchByMeaning, fallbackMessage, statusOf, useSemanticState } from '@/features/semantic/status';
 import { DataGate } from '@/features/sync/DataGate';
 import { usePullRefresh } from '@/lib/use-pull-refresh';
 import type { MemoryType } from '@/data/types';
@@ -72,6 +73,10 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const [sort, setSort] = useState<SearchSort>('relevance');
   const [filterOpen, setFilterOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  // Search by meaning is offered only when the server reports it working AND the user opted in; off by default.
+  const [byMeaning, setByMeaning] = useState(false);
+  const meaningAvailable = canSearchByMeaning(statusOf(useSemanticState()));
+  const semantic = byMeaning && meaningAvailable;
 
   // Search runs on the debounced text, so typing never fires a search per keystroke.
   const debounced = useDebouncedValue(query, DEBOUNCE_MS);
@@ -79,8 +84,8 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const terms = useMemo(() => tokenize(debounced), [debounced]);
   const active = terms.length > 0 || hasFilters(filters);
 
-  const request = useMemo(() => ({ query: debounced, filters, sort }), [debounced, filters, sort]);
-  const { status, hits, stale, retry } = useSearch(request, memories, collections, undefined, active);
+  const request = useMemo(() => ({ query: debounced, filters, sort, semantic }), [debounced, filters, sort, semantic]);
+  const { status, hits, stale, retry, outcome } = useSearch(request, memories, collections, undefined, active);
 
   const collectionName = (id?: string) => collections.find((c) => c.id === id)?.name;
   const shownSort = effectiveSort(sort, debounced);
@@ -228,7 +233,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
           setQuery(t);
           setLimit(PAGE);
         }}
-        placeholder="Search titles, content and tags"
+        placeholder={semantic ? 'Describe what you’re looking for' : 'Search titles, content and tags'}
         returnKeyType="search"
         onSubmitEditing={commit}
         autoCorrect={false}
@@ -247,6 +252,17 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
           selected={filters.favoritesOnly}
           onPress={() => update({ ...filters, favoritesOnly: !filters.favoritesOnly })}
         />
+        {meaningAvailable ? (
+          <Chip
+            label="By meaning"
+            icon="idea"
+            selected={semantic}
+            onPress={() => {
+              setByMeaning((v) => !v);
+              setLimit(PAGE);
+            }}
+          />
+        ) : null}
         {TYPES.map((t) => (
           <Chip
             key={t}
@@ -257,6 +273,14 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
           />
         ))}
       </ScrollView>
+
+      {semantic && terms.length > 0 && outcome ? (
+        <Text variant="caption" tone="muted" accessibilityLiveRegion="polite">
+          {outcome.mode === 'semantic'
+            ? `Results by meaning${outcome.complete ? '' : ' · still indexing, so some memories may be missing'}`
+            : fallbackMessage(outcome.fallbackReason)}
+        </Text>
+      ) : null}
 
       {filters.collectionId || filters.tags.length > 0 ? (
         <View style={styles.wrap}>
