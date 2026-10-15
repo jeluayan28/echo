@@ -10,6 +10,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { useReducedMotion } from 'react-native-reanimated';
 
 import { restoreSession, useSession } from '@/auth/session';
 import { ToastProvider } from '@/components/ui';
@@ -40,6 +41,9 @@ export default function RootLayout() {
     Inter_700Bold,
   });
   const { status } = useSession();
+  const reduceMotion = useReducedMotion();
+  // Modals slide up from the bottom; with reduce-motion on they fade instead (no travel).
+  const modalAnimation = reduceMotion ? 'fade' : 'slide_from_bottom';
   const signedIn = status === 'signedIn';
   // Wait for fonts AND for the stored session to be read, so the first frame is the right screen.
   const ready = (fontsLoaded || !!fontError) && status !== 'restoring';
@@ -76,10 +80,10 @@ export default function RootLayout() {
               <Stack.Screen name="search-results" />
               <Stack.Screen name="settings" />
               {/* Capture + edit are modals over whatever screen opened them. */}
-              <Stack.Screen name="memory/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+              <Stack.Screen name="memory/new" options={{ presentation: 'modal', animation: modalAnimation }} />
               <Stack.Screen
                 name="memory/[id]/edit"
-                options={{ presentation: 'modal', animation: 'slide_from_bottom' }}
+                options={{ presentation: 'modal', animation: modalAnimation }}
               />
             </Stack.Protected>
             <Stack.Protected guard={!signedIn}>

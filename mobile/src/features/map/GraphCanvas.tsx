@@ -40,6 +40,7 @@ import {
 const AnimatedG = Animated.createAnimatedComponent(G);
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 const AnimatedText = Animated.createAnimatedComponent(SvgText);
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
 const LABEL_FONT_SIZE = 12;
 const MAX_LABELS = 12;
@@ -300,6 +301,7 @@ export function GraphCanvas({
               <NodeLayer nodes={visibleNodes} positions={positions} matchIds={matchIds} searchActive={searchActive} />
               {selected && selectedPos ? (
                 <SelectionOverlay
+                  key={selected.id}
                   node={selected}
                   position={selectedPos}
                   neighbors={visibleNodes.filter((n) => neighborIds.has(n.id))}
@@ -361,6 +363,10 @@ const NodeLayer = memo(function NodeLayer({ nodes, positions, matchIds, searchAc
   );
 });
 
+/**
+ * The selected node's highlight. It eases in once (halo grows, neighbor rings fade up) on the UI thread and then
+ * stays still, with no looping pulse. Keyed by node id, so choosing another node replays the gentle entrance.
+ */
 function SelectionOverlay({
   node,
   position,
@@ -372,17 +378,29 @@ function SelectionOverlay({
   neighbors: GraphNode[];
   positions: Map<string, Point>;
 }) {
+  const { base } = useMotion();
   const r = nodeRadius(node.degree);
+  const progress = useSharedValue(0);
+
+  useEffect(() => {
+    progress.set(withTiming(1, { duration: base, easing: Easing.out(Easing.cubic) }));
+  }, [base, progress]);
+
+  const haloProps = useAnimatedProps(() => ({ r: r + 3 + 6 * progress.get(), opacity: 0.16 * progress.get() }));
+  const ringsProps = useAnimatedProps(() => ({ opacity: progress.get() }));
+
   return (
     <>
-      {neighbors.map((n) => {
-        const p = positions.get(n.id);
-        if (!p) return null;
-        return (
-          <Circle key={n.id} cx={p.x} cy={p.y} r={nodeRadius(n.degree) + 3} stroke={colors.cyan} strokeWidth={1.5} fill="none" opacity={0.85} />
-        );
-      })}
-      <Circle cx={position.x} cy={position.y} r={r + 9} fill={colors.cyan} opacity={0.16} />
+      <AnimatedG animatedProps={ringsProps}>
+        {neighbors.map((n) => {
+          const p = positions.get(n.id);
+          if (!p) return null;
+          return (
+            <Circle key={n.id} cx={p.x} cy={p.y} r={nodeRadius(n.degree) + 3} stroke={colors.cyan} strokeWidth={1.5} fill="none" opacity={0.85} />
+          );
+        })}
+      </AnimatedG>
+      <AnimatedCircle cx={position.x} cy={position.y} fill={colors.cyan} animatedProps={haloProps} />
       <Circle cx={position.x} cy={position.y} r={r} fill={colors.cyan} />
     </>
   );

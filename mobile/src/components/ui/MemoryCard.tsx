@@ -62,6 +62,7 @@ export function MemoryCard({
       accessibilityRole="button"
       accessibilityLabel={a11y}
       pressedScale={0.985}
+      highlight
       style={styles.card}
     >
       <View style={styles.header}>

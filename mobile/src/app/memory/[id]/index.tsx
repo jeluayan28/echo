@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { ScreenHeader, SectionHeader } from '@/components/layout';
-import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Screen, Skeleton, Text, useToast } from '@/components/ui';
+import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Reveal, Screen, Skeleton, Text, useToast } from '@/components/ui';
 import { memoryActions, useCollection, useMemories, useMemoryDetail, useSuggestions } from '@/data/hooks';
 import { describeError } from '@/data/errors';
 import { deleteMemoryWithUndo } from '@/features/memory/delete-memory';
@@ -118,12 +118,15 @@ export default function MemoryDetailScreen() {
           Couldn’t load the full text. Tap to retry.
         </Text>
       ) : null}
-      <Text variant="display">{memory.title}</Text>
-      <Text variant="caption" tone="muted">
-        Created {formatActivity(memory.createdAt)}
-        {edited ? ` · Edited ${formatActivity(memory.updatedAt)}` : ''}
-      </Text>
+      <Reveal>
+        <Text variant="display">{memory.title}</Text>
+        <Text variant="caption" tone="muted">
+          Created {formatActivity(memory.createdAt)}
+          {edited ? ` · Edited ${formatActivity(memory.updatedAt)}` : ''}
+        </Text>
+      </Reveal>
 
+      <Reveal delay={60}>
       {attachment && (
         <View style={{ gap: spacing.xxs }}>
           <VoicePlayer uri={attachment.uri} durationMs={attachment.durationMs} />
@@ -164,6 +167,9 @@ export default function MemoryDetailScreen() {
         </View>
       )}
 
+      </Reveal>
+
+      <Reveal delay={120}>
       <ReminderSection memory={memory} />
 
       <SectionHeader title="Linked memories" />
@@ -180,6 +186,7 @@ export default function MemoryDetailScreen() {
           ))}
         </>
       ) : null}
+      </Reveal>
 
       <LinkSheet memory={memory} visible={linking} onClose={() => setLinking(false)} />
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import Animated, { FadeInDown, FadeOutDown, ReduceMotion } from 'react-native-reanimated';
 
 import { ScreenHeader } from '@/components/layout';
 import { EmptyState, ErrorState, IconButton, Screen, SearchBar, Text } from '@/components/ui';
@@ -13,7 +14,7 @@ import { NodeDetailPanel } from '@/features/map/NodeDetailPanel';
 import { useNeuralMap } from '@/features/map/use-neural-map';
 import { runSync, useSyncStatus } from '@/data/sync';
 import { usePullRefresh } from '@/lib/use-pull-refresh';
-import { colors, spacing, useLayout } from '@/theme';
+import { colors, motion, spacing, useLayout } from '@/theme';
 
 type Mode = 'graph' | 'list';
 
@@ -203,7 +204,9 @@ export default function NeuralMapScreen() {
             </View>
 
             {selected ? (
-              <View
+              <Animated.View
+                entering={FadeInDown.duration(motion.base).reduceMotion(ReduceMotion.System)}
+                exiting={FadeOutDown.duration(motion.fast).reduceMotion(ReduceMotion.System)}
                 style={[styles.panel, { left: gutter, right: gutter }]}
                 onLayout={(e) => setPanelHeight(e.nativeEvent.layout.height)}
               >
@@ -215,7 +218,7 @@ export default function NeuralMapScreen() {
                   onClose={() => map.select(null)}
                   onSelectNeighbor={selectAndFocus}
                 />
-              </View>
+              </Animated.View>
             ) : null}
           </>
         ) : null}

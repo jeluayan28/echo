@@ -8,6 +8,7 @@ export { Icon, type IconName, type IconProps } from './Icon';
 export { IconButton, type IconButtonProps } from './IconButton';
 export { MemoryCard, type MemoryCardProps, type MemoryType } from './MemoryCard';
 export { PressableScale, type PressableScaleProps } from './PressableScale';
+export { Reveal, type RevealProps } from './Reveal';
 export { Screen, type ScreenProps } from './Screen';
 export { SearchBar, type SearchBarProps } from './SearchBar';
 export { Sheet, type SheetProps } from './Sheet';
