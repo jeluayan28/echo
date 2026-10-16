@@ -7,9 +7,10 @@
  *  2. Writes to the same record are queued, so two quick taps can't reach the server out of order.
  *  3. A response that arrives after sign-out (the cache was reset meanwhile) is discarded.
  *  4. Reads that fail never half-fill the cache: `sync()` replaces everything or nothing.
+ *  5. An edit carries the version it was based on; a newer server version wins and the user chooses (docs/OFFLINE.md).
  */
 import { attachmentsApi, collectionsApi, linksApi, memoriesApi, profileApi, remindersApi, tagsApi } from '@/api';
-import { ApiError } from '@/api/client';
+import { ApiError, ConflictError } from '@/api/client';
 import {
   toAttachment,
   toCollection,
@@ -21,6 +22,8 @@ import {
   toReminder,
   toTagCount,
 } from '@/api/mappers';
+
+import type { MemoryDto } from '@/api/dto';
 
 import type { EchoRepository } from './repository';
 import { store } from './store';
@@ -140,16 +143,20 @@ export const apiRepository: EchoRepository = {
     return memory;
   },
 
-  updateMemory(id, patch) {
+  updateMemory(id, patch, { baseUpdatedAt } = {}) {
     return serial(`memory:${id}`, async () => {
       const epoch = store.epoch();
       const current = store.getState().memories.find((m) => m.id === id);
       const payload = toMemoryPayload(patch, { creating: false, currentAttachmentId: current?.attachment?.id });
       if (Object.keys(payload).length === 0) return;
+      if (baseUpdatedAt) payload.base_updated_at = baseUpdatedAt;
       let dto;
       try {
         dto = await memoriesApi.updateMemory(id, payload);
       } catch (e) {
+        // The server refused to overwrite a newer version. Show what it has (it is the source of truth), but
+        // write nothing of ours: the user decides what happens to their edit.
+        if (e instanceof ConflictError) applyIfCurrent(epoch, () => void applyDetail(e.current as unknown as MemoryDto));
         forgetIfGone(epoch, id, e);
         throw e;
       }

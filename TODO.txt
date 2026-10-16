@@ -30,7 +30,8 @@ TO DO - DO FIRST
 TO DO - UNFINISHED FEATURES
 ---------------------------
 [ ] Rediscovery snooze/dismiss: add an API endpoint + save it; today it lives on the device and resets on restart
-[ ] Settings: build Theme and Privacy (rows still say "Soon")
+[ ] Settings: build Theme (row still says "Soon"). Privacy is built: offline-copy switch + clear button.
+[ ] Settings: app lock (Face ID / passcode before opening ECHO) - not built
 [ ] Settings: password-change screen and delete-account screen (the API already supports both)
 [ ] Settings: notification quiet hours (API supports it, no UI)
 [ ] Search: infinite scroll (today it shows the best 200 matches, 4 pages of 50)
@@ -40,9 +41,13 @@ TO DO - RELIABILITY / SCALE
 ---------------------------
 [ ] Sync: load only what changed (API has updated_since) instead of every memory on sign-in.
     Fine for thousands of memories, not for very large accounts
-[ ] Offline: keep a copy of the data across app restarts
-[ ] Offline: queue writes made without a connection (today an offline save fails with a clear message
-    and keeps what you typed)
+[x] Offline: read-only copy kept across restarts (cache dir, not encrypted by ECHO). Rules + limits: mobile/docs/OFFLINE.md
+[x] Edit conflicts: server refuses an edit based on an older version (409); editor offers keep mine / use latest
+[ ] Offline: queue writes made without a connection (today an offline save fails with a clear message and
+    keeps what you typed). Must follow the conflict rules in mobile/docs/OFFLINE.md section 2.
+[ ] Verify ON A DEVICE (only unit-tested): offline copy survives restart, banner shows in airplane mode,
+    Privacy -> Clear offline copy, copy absent from iOS/Android backups, 401 after reconnect erases it
+[ ] Optional: encrypt the offline copy with a Keychain/Keystore-held key (needs a native crypto module)
 
 TO DO - BEFORE RELEASE
 ----------------------

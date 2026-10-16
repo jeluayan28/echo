@@ -9,6 +9,7 @@ use App\Http\Resources\MemorySummaryResource;
 use App\Models\Memory;
 use App\Models\MemoryLink;
 use App\Models\MemoryReminder;
+use App\Services\MemoryConflict;
 use App\Services\MemoryWriter;
 use App\Support\Pagination;
 use Illuminate\Http\JsonResponse;
@@ -62,11 +63,20 @@ class MemoryController extends Controller
         return new MemoryResource($this->detail($memory));
     }
 
-    public function update(MemoryRequest $request, Memory $memory): MemoryResource
+    /** 409 when `base_updated_at` no longer matches: the body carries the server's current copy, nothing is written. */
+    public function update(MemoryRequest $request, Memory $memory): MemoryResource|JsonResponse
     {
         $this->authorize('update', $memory);
 
-        return new MemoryResource($this->detail($this->writer->update($memory, $request->validated())));
+        try {
+            return new MemoryResource($this->detail($this->writer->update($memory, $request->validated())));
+        } catch (MemoryConflict $conflict) {
+            return response()->json([
+                'message' => $conflict->getMessage(),
+                'code' => 'conflict',
+                'current' => (new MemoryResource($this->detail($conflict->current)))->resolve($request),
+            ], 409);
+        }
     }
 
     /** Soft delete: the memory goes to the trash (with its links, tags and reminder intact) and can be restored. */

@@ -4,7 +4,8 @@ import { StyleSheet, TextInput, View } from 'react-native';
 
 import { CollectionPicker, MemoryTypeSelector, TagInput } from '@/components/forms';
 import { ScreenHeader } from '@/components/layout';
-import { Button, ConfirmDialog, Screen, Switch, Text, TextField, useToast } from '@/components/ui';
+import { ApiError, ConflictError } from '@/api/client';
+import { Button, ConfirmDialog, Screen, Sheet, Switch, Text, TextField, useToast } from '@/components/ui';
 import { SaveError, describeError } from '@/data/errors';
 import { useCollections, useTags } from '@/data/hooks';
 import type { Memory, MemoryType } from '@/data/types';
@@ -40,6 +41,14 @@ function describeFailure(e: unknown): SaveProblem {
           : `${(e.cause as { message?: string } | undefined)?.message ?? 'Couldn’t upload the recording.'} It’s still here.`,
     };
   }
+  const cause = (e as { cause?: unknown })?.cause;
+  if (cause instanceof ApiError && cause.status === 404) {
+    // Rule 6 (docs/OFFLINE.md): a deletion elsewhere wins; the edit is never turned into a new memory.
+    return {
+      phase: 'save',
+      message: 'This memory was deleted somewhere else, so your changes can’t be saved. Your text is still here if you want to copy it.',
+    };
+  }
   // `cause` is the underlying ApiError/NetworkError: say what really happened (offline, validation, rate limit).
   const reason = describeError((e as { cause?: unknown })?.cause, '');
   return {
@@ -64,6 +73,9 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
   const [saving, setSaving] = useState<'idle' | 'uploading' | 'saving'>('idle');
   const [progress, setProgress] = useState(0);
   const [problem, setProblem] = useState<SaveProblem>();
+  // Rule 3/4 (docs/OFFLINE.md): the version this edit started from, and what to do when the server has a newer one.
+  const baseUpdatedAt = useRef(memory?.updatedAt);
+  const [conflict, setConflict] = useState<{ latestUpdatedAt: string }>();
   const [pendingLeave, setPendingLeave] = useState<{ dispatch: () => void }>();
 
   const abort = useRef<AbortController | null>(null);
@@ -122,6 +134,7 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
     try {
       const { id } = await saveMemory({
         memoryId: memory?.id,
+        baseUpdatedAt: baseUpdatedAt.current,
         input: form.buildInput(),
         audio: form.type === 'voice' ? form.audio : undefined,
         signal: controller.signal,
@@ -139,11 +152,27 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
     } catch (e) {
       if (e instanceof SaveError && e.reason === 'cancelled') {
         // The user cancelled; nothing to report.
+      } else if (e instanceof SaveError && e.cause instanceof ConflictError) {
+        setConflict({ latestUpdatedAt: String(e.cause.current.updated_at ?? '') });
       } else {
         setProblem(describeFailure(e));
       }
       setSaving('idle');
     }
+  };
+
+  const keepMine = () => {
+    // An explicit, informed overwrite: re-send, now based on the server's newer version.
+    if (conflict?.latestUpdatedAt) baseUpdatedAt.current = conflict.latestUpdatedAt;
+    setConflict(undefined);
+    void save();
+  };
+
+  const useLatest = () => {
+    setConflict(undefined);
+    allowLeave.current = true;
+    void deleteLocalFile(form.audio.local?.uri);
+    goBack(); // the detail screen behind this one already shows the server's copy
   };
 
   const saveLabel = (() => {
@@ -268,6 +297,21 @@ export function MemoryEditor({ mode, memory, initialType, initialCollectionId, o
           <Button label="Cancel upload" variant="ghost" fullWidth onPress={() => abort.current?.abort()} />
         )}
       </View>
+
+      <Sheet visible={!!conflict} onClose={() => setConflict(undefined)} title="Changed somewhere else">
+        <View style={{ gap: spacing.sm, paddingVertical: spacing.sm }}>
+          <Text variant="body" tone="muted">
+            This memory was changed after you opened it, so your edit was not saved. Nothing has been overwritten. Choose
+            what to keep.
+          </Text>
+          <Button label="Use the latest version" variant="secondary" fullWidth onPress={useLatest} />
+          <Button label="Keep my version" fullWidth onPress={keepMine} />
+          <Text variant="caption" tone="muted">
+            “Keep my version” replaces the newer changes with what you typed here. “Use the latest” discards your edit.
+          </Text>
+          <Button label="Keep editing" variant="ghost" fullWidth onPress={() => setConflict(undefined)} />
+        </View>
+      </Sheet>
 
       <ConfirmDialog
         visible={!!pendingLeave}

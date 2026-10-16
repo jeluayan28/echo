@@ -46,6 +46,8 @@ class MemoryRequest extends FormRequest
             // Required for link memories; an optional "source" on others. http(s) only (no javascript:, file:, data:).
             'source_url' => [$type === 'link' ? $required : 'sometimes', $type === 'link' ? 'string' : 'nullable', 'url:http,https', 'max:2048'],
             'collection_id' => ['sometimes', 'nullable', 'string', Rule::exists('collections', 'id')->where('user_id', $userId)],
+            // Update only: the `updated_at` the client's copy was based on. A mismatch is a 409 (see MemoryWriter).
+            'base_updated_at' => $creating ? ['prohibited'] : ['sometimes', 'date'],
             'favorite' => ['sometimes', 'boolean'],
             'pinned' => ['sometimes', 'boolean'],
             'tags' => ['sometimes', 'array', 'max:10'],

@@ -34,6 +34,20 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * 409 `conflict` from an edit that was based on an older version: nothing was written, and `current` is the
+ * server's full copy (raw wire format; the data layer maps it). Other 409s stay plain `ApiError`s.
+ */
+export class ConflictError extends ApiError {
+  constructor(
+    message: string,
+    public readonly current: Record<string, unknown>,
+  ) {
+    super(409, message);
+    this.name = 'ConflictError';
+  }
+}
+
 export class NetworkError extends Error {
   constructor(
     message = 'Can’t reach ECHO right now. Check your connection and try again.',
@@ -57,6 +71,14 @@ type AuthHooks = {
   /** Called when the server rejects the token on an authenticated request (expired / revoked). */
   onUnauthorized: () => void;
 };
+
+type ReachabilityListener = (reachable: boolean) => void;
+let reachability: ReachabilityListener = () => undefined;
+
+/** Told after every request whether the server could be reached at all (any HTTP answer counts). */
+export function setReachabilityListener(listener: ReachabilityListener) {
+  reachability = listener;
+}
 
 let hooks: AuthHooks = { getToken: () => null, onUnauthorized: () => undefined };
 
@@ -101,6 +123,9 @@ export function parseErrorBody(status: number, body: unknown, retryAfter?: numbe
     }
   }
   const serverMessage = typeof record.message === 'string' ? record.message : undefined;
+  if (status === 409 && record.code === 'conflict' && record.current && typeof record.current === 'object') {
+    return new ConflictError(serverMessage ?? 'This memory was changed somewhere else.', record.current as Record<string, unknown>);
+  }
   return new ApiError(status, friendlyMessage(status, serverMessage), fieldErrors, retryAfter);
 }
 
@@ -154,12 +179,14 @@ async function once(method: Method, path: string, options: RequestOptions): Prom
     });
   } catch {
     if (signal?.aborted) throw new RequestCancelled();
+    reachability(false);
     throw timedOut ? new NetworkError('ECHO took too long to respond. Please try again.', true) : new NetworkError();
   } finally {
     clearTimeout(timer);
     signal?.removeEventListener('abort', onAbort);
   }
 
+  reachability(true); // the server answered (even with an error page from a proxy, handled below)
   if (response.status === 204) return undefined;
 
   let json: unknown;
@@ -171,6 +198,7 @@ async function once(method: Method, path: string, options: RequestOptions): Prom
 
   // A 2xx that isn't our JSON is a captive-portal / proxy page, not the API: never treat it as data.
   if (response.ok && json === undefined) {
+    reachability(false);
     throw new NetworkError('ECHO sent an unexpected response. Check your connection (or sign in to the Wi-Fi) and try again.');
   }
 

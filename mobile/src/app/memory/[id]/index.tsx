@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { ScreenHeader, SectionHeader } from '@/components/layout';
 import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Reveal, Screen, Skeleton, Text, useToast } from '@/components/ui';
 import { memoryActions, useCollection, useMemories, useMemoryDetail, useSuggestions } from '@/data/hooks';
+import { useConnectivity } from '@/data/connectivity';
 import { describeError } from '@/data/errors';
 import { deleteMemoryWithUndo } from '@/features/memory/delete-memory';
 import { SuggestionCard } from '@/features/rediscovery/SuggestionCard';
@@ -39,6 +40,7 @@ export default function MemoryDetailScreen() {
   const { memory, status, retry } = useMemoryDetail(id, { open: true });
   const [, setBusy] = useState(false);
   const once = useSingleFlight();
+  const { online } = useConnectivity();
   const collection = useCollection(memory?.collectionId);
   const all = useMemories();
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -115,7 +117,9 @@ export default function MemoryDetailScreen() {
     >
       {status === 'error' ? (
         <Text variant="caption" tone="error" accessibilityRole="alert" onPress={retry}>
-          Couldn’t load the full text. Tap to retry.
+          {online
+            ? 'Couldn’t load the full text. Tap to retry.'
+            : 'You’re offline, so only a preview is available. The full text isn’t saved on this device yet. Tap to retry.'}
         </Text>
       ) : null}
       <Reveal>
@@ -127,7 +131,13 @@ export default function MemoryDetailScreen() {
       </Reveal>
 
       <Reveal delay={60}>
-      {attachment && (
+      {attachment && !attachment.uri && (
+        // Signed audio links are never saved on the device (docs/OFFLINE.md), so a saved copy has none.
+        <Text variant="caption" tone="muted">
+          The recording isn’t available offline. Reconnect to play it.
+        </Text>
+      )}
+      {attachment && !!attachment.uri && (
         <View style={{ gap: spacing.xxs }}>
           <VoicePlayer uri={attachment.uri} durationMs={attachment.durationMs} />
           <Text variant="caption" tone="muted">

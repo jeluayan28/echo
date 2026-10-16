@@ -15,6 +15,7 @@ export function installFakeServer() {
   const calls: { method: string; path: string; body?: Json; auth?: string }[] = [];
   let failNext: { status: number; body?: Json } | 'network' | null = null;
   let delayMs = 0;
+  let offline = false;
 
   const id = (p: string) => `${p}${(++db.seq).toString().padStart(4, '0')}`;
   const now = () => new Date(Date.UTC(2026, 0, 1) + db.seq * 1000).toISOString();
@@ -43,6 +44,7 @@ export function installFakeServer() {
 
   async function handle(method: string, url: string, body?: Json) {
     const path = new URL(url).pathname.replace(/^.*\/api\/v1/, '');
+    if (offline) throw new TypeError('Network request failed');
     if (failNext) {
       const f = failNext;
       failNext = null;
@@ -89,8 +91,12 @@ export function installFakeServer() {
       if (method === 'PATCH') {
         if ('type' in body!)
           return res(422, { message: 'x', errors: { type: ['The type of a memory cannot be changed.'] } });
-        const content = Object.keys(body!).some((k) => k !== 'favorite' && k !== 'pinned');
-        Object.assign(mem, body, content ? { updated_at: new Date(Date.parse(mem.updated_at) + 60_000).toISOString() } : {});
+        const { base_updated_at: base, ...fields } = body!;
+        // Same rule as the Laravel API: an edit based on an older version is refused and nothing is written.
+        if (base && Math.floor(Date.parse(base) / 1000) !== Math.floor(Date.parse(mem.updated_at) / 1000))
+          return res(409, { message: 'This memory was changed somewhere else since you opened it.', code: 'conflict', current: detail(mem) });
+        const content = Object.keys(fields).some((k) => k !== 'favorite' && k !== 'pinned');
+        Object.assign(mem, fields, content ? { updated_at: new Date(Date.parse(mem.updated_at) + 60_000).toISOString() } : {});
         return res(200, { data: detail(mem) });
       }
       if (method === 'DELETE') {
@@ -187,6 +193,10 @@ export function installFakeServer() {
     /** The next request fails with this HTTP status, or with a network error. */
     failNext: (f: { status: number; body?: Json } | 'network') => {
       failNext = f;
+    },
+    /** While true every request fails like a lost connection (until set back to false). */
+    setOffline: (value: boolean) => {
+      offline = value;
     },
     setDelay: (ms: number) => {
       delayMs = ms;

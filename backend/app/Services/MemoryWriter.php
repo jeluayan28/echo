@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Attachment;
 use App\Models\Memory;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -33,11 +34,24 @@ class MemoryWriter
         });
     }
 
+    /**
+     * `$data['base_updated_at']`, when present, is a precondition: the update is applied only if the stored
+     * memory still has that `updated_at` (compared to the second, the precision the API exposes). Otherwise
+     * nothing is written and MemoryConflict carries the current row. The check runs under a row lock so two
+     * racing edits cannot both pass it.
+     */
     public function update(Memory $memory, array $data): Memory
     {
         $replaced = null;
 
         DB::transaction(function () use ($memory, $data, &$replaced) {
+            if (isset($data['base_updated_at'])) {
+                $current = Memory::query()->whereKey($memory->id)->lockForUpdate()->firstOrFail();
+                if ($current->updated_at?->getTimestamp() !== Carbon::parse($data['base_updated_at'])->getTimestamp()) {
+                    throw new MemoryConflict($current);
+                }
+            }
+
             $fields = Arr::only($data, array_diff(self::FIELDS, ['type'])); // the type is fixed once created
             $memory->fill($fields);
 

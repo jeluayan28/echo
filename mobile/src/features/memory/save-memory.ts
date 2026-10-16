@@ -17,6 +17,8 @@ export type SaveRequest = {
   audio?: AudioDraft;
   onProgress?: UploadOptions['onProgress'];
   signal?: AbortSignal;
+  /** Editing: the `updatedAt` this edit was made from. The server refuses it if the memory has changed since. */
+  baseUpdatedAt?: string;
   /** Called as soon as the upload completes so the caller can remember it for a retry. */
   onUploaded?: (attachment: Attachment) => void;
 };
@@ -30,6 +32,7 @@ export type SaveRequest = {
  */
 export async function saveMemory({
   memoryId,
+  baseUpdatedAt,
   input,
   audio,
   onProgress,
@@ -51,7 +54,7 @@ export async function saveMemory({
 
   try {
     let id = memoryId;
-    if (memoryId) await repository.updateMemory(memoryId, record);
+    if (memoryId) await repository.updateMemory(memoryId, record, { baseUpdatedAt });
     else id = (await repository.createMemory(record)).id;
     // The server has the recording now; the device copy is no longer needed.
     if (audio?.local && input.type === 'voice') await deleteLocalFile(audio.local.uri);

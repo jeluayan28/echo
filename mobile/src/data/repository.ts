@@ -23,6 +23,8 @@ export type UploadOptions = {
   signal?: AbortSignal;
 };
 
+export type UpdateOptions = { baseUpdatedAt?: string };
+
 export type LoadMemoryOptions = {
   /** Also record that the user opened it (powers "Continue exploring"). */
   open?: boolean;
@@ -46,7 +48,12 @@ export interface EchoRepository {
   uploadAttachment(file: LocalFile, options?: UploadOptions): Promise<Attachment>;
 
   createMemory(input: MemoryInput): Promise<Memory>;
-  updateMemory(id: string, patch: Partial<MemoryInput>): Promise<void>;
+  /**
+   * With `baseUpdatedAt` (the `updatedAt` of the copy the edit was made from) the server refuses the write when
+   * the memory has changed since: rejects with `ConflictError`, nothing is written, and the cache is updated
+   * with the server's current copy. Without it the write is unconditional (favorite / pin toggles).
+   */
+  updateMemory(id: string, patch: Partial<MemoryInput>, options?: UpdateOptions): Promise<void>;
   /** Soft delete: the memory moves to the trash and can be brought back with `restoreMemory`. */
   deleteMemory(id: string): Promise<void>;
   /** Undo `deleteMemory`. Rejects if the memory was already purged. */

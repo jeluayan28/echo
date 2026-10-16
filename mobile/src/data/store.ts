@@ -5,8 +5,9 @@
  * it (always with data the server just returned), and `hooks.ts` reads from it. It starts empty, is replaced
  * wholesale by a sync, and is wiped on sign-out so one account's data can never show up in another's session.
  *
- * Not persisted: a cold start fetches again. (Rediscovery snooze/dismiss choices are the one thing that exists
- * only here — the API has no endpoint for them yet.)
+ * Persisted only as the limited offline copy (`offline-cache.ts`, see docs/OFFLINE.md), which is loaded back on
+ * launch with `hydrate` and replaced by the next sync. Rediscovery snooze/dismiss choices exist only here —
+ * the API has no endpoint for them yet — and are not persisted.
  */
 import type {
   Collection,
@@ -121,6 +122,24 @@ export const store = {
       tags: data.tags,
       reminders: remindersById,
       rediscovery,
+    });
+  },
+
+  /**
+   * Fill the (empty) cache from the offline copy on launch. Not a sync: the data may be stale, and the next
+   * successful sync replaces it wholesale. Does not bump the epoch (the session is the same one).
+   */
+  hydrate(data: { memories: Memory[]; collections: Collection[]; links: Link[]; tags: TagCount[]; reminders: Reminder[] }) {
+    const reminders: Record<string, Reminder> = {};
+    const alive = new Set(data.memories.map((m) => m.id));
+    for (const r of data.reminders) if (alive.has(r.memoryId)) reminders[r.memoryId] = r;
+    setState({
+      ...state,
+      memories: withLinkedIds(data.memories, data.links),
+      collections: data.collections,
+      links: data.links,
+      tags: data.tags,
+      reminders,
     });
   },
 

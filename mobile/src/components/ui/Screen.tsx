@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 
+import { OfflineBanner } from '@/features/sync/OfflineBanner';
 import { colors, layout, spacing, useLayout } from '@/theme';
 
 export type ScreenProps = {
@@ -75,6 +76,11 @@ export function Screen({
           <View style={column}>{header}</View>
         </View>
       ) : null}
+      <View style={styles.headerWrap}>
+        <View style={column}>
+          <OfflineBanner />
+        </View>
+      </View>
       {keyboardAvoiding ? (
         // "padding" is the behavior that works with Android edge-to-edge (SDK 57 default) as well as iOS.
         <KeyboardAvoidingView behavior="padding" style={styles.flex}>

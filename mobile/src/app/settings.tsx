@@ -7,6 +7,7 @@ import { signOut } from '@/auth/session';
 import { Button, ConfirmDialog, Icon, Screen, Text, useToast } from '@/components/ui';
 import { useProfile } from '@/data/hooks';
 import { canSearchByMeaning, statusOf, useSemanticState } from '@/features/semantic/status';
+import { PrivacySheet } from '@/features/settings/PrivacySheet';
 import { NotificationsSheet } from '@/features/settings/NotificationsSheet';
 import { SemanticSearchSheet } from '@/features/settings/SemanticSearchSheet';
 import { ProfileSheet } from '@/features/settings/ProfileSheet';
@@ -18,7 +19,7 @@ import { colors, radius, spacing } from '@/theme';
 
 /**
  * Profile & settings. Profile and notification preferences are stored on the server; sign-out clears this
- * device. Rows for features that don't exist yet (Theme, Privacy) are inert and labelled "Soon".
+ * device. Rows for features that don't exist yet (Theme) are inert and labelled "Soon".
  */
 export default function SettingsScreen() {
   const goBack = useSafeBack();
@@ -27,6 +28,7 @@ export default function SettingsScreen() {
   const [editing, setEditing] = useState(false);
   const [notifications, setNotifications] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
+  const [privacyOpen, setPrivacyOpen] = useState(false);
   const semantic = statusOf(useSemanticState());
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -53,7 +55,7 @@ export default function SettingsScreen() {
       <View style={styles.list}>
         <ListRow icon="user" title="Profile" subtitle="Name and email" onPress={() => setEditing(true)} />
         <ListRow icon="eye" title="Theme" subtitle="Appearance" comingSoon />
-        <ListRow icon="lock" title="Privacy" subtitle="App lock and data" comingSoon />
+        <ListRow icon="lock" title="Privacy" subtitle="Offline copy and local data" onPress={() => setPrivacyOpen(true)} />
         <ListRow icon="bell" title="Notifications" subtitle="Reminders" onPress={() => setNotifications(true)} />
         <ListRow
           icon="search"
@@ -81,6 +83,7 @@ export default function SettingsScreen() {
 
       <ProfileSheet visible={editing} onClose={() => setEditing(false)} profile={profile} />
       <NotificationsSheet visible={notifications} onClose={() => setNotifications(false)} />
+      <PrivacySheet visible={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       <SemanticSearchSheet visible={semanticOpen} onClose={() => setSemanticOpen(false)} />
       <ConfirmDialog
         visible={confirmSignOut}

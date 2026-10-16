@@ -9,8 +9,10 @@ import { useSyncExternalStore } from 'react';
 
 import { authApi, setAuthHooks } from '@/api';
 import { toProfile } from '@/api/mappers';
+import { connectivity } from '@/data/connectivity';
+import { offlineCache, offlinePreference, startPersisting, stopPersisting } from '@/data/offline-cache';
 import { store } from '@/data/store';
-import { resetSync, runSync } from '@/data/sync';
+import { markHydrated, resetSync, runSync } from '@/data/sync';
 import type { Profile } from '@/data/types';
 import { cancelAllReminderNotifications } from '@/features/reminders/notifications';
 import { resetSemanticStatus } from '@/features/semantic/status';
@@ -53,17 +55,22 @@ export function useSession(): SessionState {
 /** Wipe everything that belongs to the account that is leaving. */
 async function wipeLocalData() {
   token = null;
+  stopPersisting(); // first: nothing scheduled may write after this point
   store.reset();
   resetSync();
+  connectivity.reset();
   recentSearches.clear();
   resetSemanticStatus();
-  await Promise.allSettled([clearSession(), cancelAllReminderNotifications()]);
+  await Promise.allSettled([clearSession(), offlineCache.clear(), cancelAllReminderNotifications()]);
 }
 
 async function startSession(payload: { token: string; expires_at: string | null; user: Parameters<typeof toProfile>[0] }) {
   const user = toProfile(payload.user);
   store.reset({ profile: user }); // a clean slate: nothing from a previous account can leak in
   resetSync();
+  connectivity.reset();
+  await offlinePreference.load();
+  await offlineCache.clear(); // a copy left by anyone else (or by a crash) is never adopted
   token = payload.token;
   expiresAt = payload.expires_at;
   try {
@@ -72,6 +79,7 @@ async function startSession(payload: { token: string; expires_at: string | null;
     // Secure storage unavailable: the session works until the app closes, then the user signs in again.
   }
   set({ status: 'signedIn', user });
+  startPersisting();
   void runSync('initial');
 }
 
@@ -79,15 +87,24 @@ async function startSession(payload: { token: string; expires_at: string | null;
 export async function restoreSession(): Promise<void> {
   const saved = await loadSession();
   if (!saved || (saved.expiresAt && Date.parse(saved.expiresAt) <= Date.now())) {
-    await clearSession();
+    // No usable session, so no offline copy either (rule 9 in docs/OFFLINE.md).
+    await Promise.allSettled([clearSession(), offlineCache.clear()]);
     set({ status: 'signedOut' });
     return;
   }
   token = saved.token;
   expiresAt = saved.expiresAt;
+  await offlinePreference.load();
+  const copy = await offlineCache.load(saved.user.email);
   store.reset({ profile: saved.user });
+  if (copy) {
+    // Show the device copy at once (even with no connection); the sync below replaces it with the server's data.
+    store.hydrate(copy.data);
+    markHydrated(copy.syncedAt);
+  }
   set({ status: 'signedIn', user: saved.user });
-  void runSync('initial');
+  startPersisting(copy?.syncedAt);
+  void runSync(copy ? 'refresh' : 'initial');
 }
 
 export async function signIn(input: authApi.LoginInput): Promise<void> {
