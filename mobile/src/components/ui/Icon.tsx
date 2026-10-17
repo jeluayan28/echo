@@ -47,6 +47,8 @@ const icons = {
   recenter: 'crosshair',
   zoomIn: 'plus',
   zoomOut: 'minus',
+  dream: 'moon',
+  skip: 'skip-forward',
 } as const satisfies Record<string, ComponentProps<typeof Feather>['name']>;
 
 export type IconName = keyof typeof icons;

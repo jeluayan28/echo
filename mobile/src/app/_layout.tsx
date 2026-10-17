@@ -79,6 +79,7 @@ export default function RootLayout() {
               <Stack.Screen name="collection/[id]" />
               <Stack.Screen name="search-results" />
               <Stack.Screen name="settings" />
+              <Stack.Screen name="dream" />
               {/* Capture + edit are modals over whatever screen opened them. */}
               <Stack.Screen name="memory/new" options={{ presentation: 'modal', animation: modalAnimation }} />
               <Stack.Screen

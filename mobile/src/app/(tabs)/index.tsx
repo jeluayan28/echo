@@ -8,6 +8,7 @@ import { refreshIfStale } from '@/data/sync';
 import { ContinueExploring } from '@/features/core/ContinueExploring';
 import { DashboardSkeleton, StatusSkeleton } from '@/features/core/DashboardSkeleton';
 import { DashboardTopBar, Greeting } from '@/features/core/DashboardHeader';
+import { DreamEntry } from '@/features/dream/DailyDiscoveryCard';
 import { QuickCapture } from '@/features/core/QuickCapture';
 import { RecentConnections } from '@/features/core/RecentConnections';
 import { RediscoverSection } from '@/features/core/RediscoverSection';
@@ -74,6 +75,8 @@ export default function MemoryCoreScreen() {
         <>
           <SectionHeader title="Continue exploring" />
           <ContinueExploring memories={data.continueExploring} />
+
+          <DreamEntry />
 
           <SectionHeader title="Rediscover" />
           <RediscoverSection rediscovery={data.rediscovery} />

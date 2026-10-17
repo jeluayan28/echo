@@ -17,6 +17,7 @@ import type { MemoryType } from '@/data/types';
  *   memory/[id]/edit.tsx      /memory/:id/edit      Edit memory (modal)
  *   memory/new.tsx            /memory/new           Create memory (modal)
  *   collection/[id].tsx       /collection/:id       Collection detail
+ *   dream.tsx                 /dream                Dream Mode (opened from Memory Core)
  *   search-results.tsx        /search-results       Search results
  *   settings.tsx              /settings             Profile & settings
  *   (auth)/login.tsx          /login                Login
@@ -38,6 +39,9 @@ export const routes = {
   login: '/login' as Href,
   register: '/register' as Href,
   designSystem: '/design-system' as Href,
+
+  /** Dream Mode; `focus` starts the session with that memory first. */
+  dream: (focus?: string): Href => (focus ? `/dream?focus=${encodeURIComponent(focus)}` : '/dream') as Href,
 
   /** Opens the create flow, optionally preselecting a memory type and/or collection. */
   newMemory: (type?: MemoryType, collectionId?: string): Href => ({

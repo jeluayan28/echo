@@ -14,6 +14,7 @@ import { offlineCache, offlinePreference, startPersisting, stopPersisting } from
 import { store } from '@/data/store';
 import { markHydrated, resetSync, runSync } from '@/data/sync';
 import type { Profile } from '@/data/types';
+import { dreamStore } from '@/features/dream/dream-store';
 import { cancelAllReminderNotifications } from '@/features/reminders/notifications';
 import { resetSemanticStatus } from '@/features/semantic/status';
 import { recentSearches } from '@/features/search/history';
@@ -61,7 +62,12 @@ async function wipeLocalData() {
   connectivity.reset();
   recentSearches.clear();
   resetSemanticStatus();
-  await Promise.allSettled([clearSession(), offlineCache.clear(), cancelAllReminderNotifications()]);
+  await Promise.allSettled([
+    clearSession(),
+    offlineCache.clear(),
+    cancelAllReminderNotifications(),
+    dreamStore.clear(),
+  ]);
 }
 
 async function startSession(payload: { token: string; expires_at: string | null; user: Parameters<typeof toProfile>[0] }) {
@@ -71,6 +77,7 @@ async function startSession(payload: { token: string; expires_at: string | null;
   connectivity.reset();
   await offlinePreference.load();
   await offlineCache.clear(); // a copy left by anyone else (or by a crash) is never adopted
+  await dreamStore.clear();
   token = payload.token;
   expiresAt = payload.expires_at;
   try {
