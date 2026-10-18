@@ -35,6 +35,7 @@ import {
   type SearchFilters,
   type SearchSort,
 } from './engine';
+import { DEFAULT_PAGES, MAX_PAGES, PER_PAGE } from './api-provider';
 import { recentSearches, useRecentSearches } from './history';
 import { SearchFilterSheet } from './SearchFilterSheet';
 import { SearchResultCard } from './SearchResultCard';
@@ -73,6 +74,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const [sort, setSort] = useState<SearchSort>('relevance');
   const [filterOpen, setFilterOpen] = useState(false);
   const [limit, setLimit] = useState(PAGE);
+  const [pages, setPages] = useState(DEFAULT_PAGES);
   // Search by meaning is offered only when the server reports it working AND the user opted in; off by default.
   const [byMeaning, setByMeaning] = useState(false);
   const meaningAvailable = canSearchByMeaning(statusOf(useSemanticState()));
@@ -84,8 +86,15 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const terms = useMemo(() => tokenize(debounced), [debounced]);
   const active = terms.length > 0 || hasFilters(filters);
 
-  const request = useMemo(() => ({ query: debounced, filters, sort, semantic }), [debounced, filters, sort, semantic]);
+  const request = useMemo(() => ({ query: debounced, filters, sort, semantic, pages }), [debounced, filters, sort, semantic, pages]);
   const { status, hits, stale, retry, outcome } = useSearch(request, memories, collections, undefined, active);
+
+  // Every requested page came back full (before the app-side tag filter), so the server may hold more.
+  const mayHaveMore = terms.length > 0 && !stale && hits.length >= pages * PER_PAGE && pages < MAX_PAGES;
+  const loadMore = () => {
+    setPages((n) => n + DEFAULT_PAGES);
+    setLimit((n) => n + PAGE);
+  };
 
   const collectionName = (id?: string) => collections.find((c) => c.id === id)?.name;
   const shownSort = effectiveSort(sort, debounced);
@@ -95,6 +104,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
   const update = (next: SearchFilters) => {
     setFilters(next);
     setLimit(PAGE);
+    setPages(DEFAULT_PAGES);
   };
   const commit = () => recentSearches.add(query);
   const open = (id: string) => {
@@ -207,6 +217,8 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
         </View>
         {hits.length > limit ? (
           <Button label={`Show more (${hits.length - limit})`} variant="secondary" onPress={() => setLimit((n) => n + PAGE)} />
+        ) : mayHaveMore ? (
+          <Button label="Load more results" variant="secondary" loading={status === 'loading'} onPress={loadMore} />
         ) : null}
       </>
     );
@@ -232,6 +244,7 @@ export function SearchView({ initial, onBack }: SearchViewProps) {
         onChangeText={(t) => {
           setQuery(t);
           setLimit(PAGE);
+          setPages(DEFAULT_PAGES);
         }}
         placeholder={semantic ? 'Describe what you’re looking for' : 'Search titles, content and tags'}
         returnKeyType="search"

@@ -14,6 +14,12 @@ export type AttachmentDto = {
   created_at: string | null;
 };
 
+export type RediscoveryStateDto = {
+  memory_id: string;
+  dismissed_at: string | null;
+  snoozed_until: string | null;
+};
+
 export type ReminderDto = {
   id: string;
   memory_id: string;

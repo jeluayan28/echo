@@ -80,6 +80,15 @@ export function mergeMemory(existing: Memory | undefined, incoming: Memory): Mem
   return { ...incoming, body: existing.body, partial: undefined };
 }
 
+const later = (a?: string, b?: string) => (a && b ? (a > b ? a : b) : (a ?? b));
+
+/** Both sides may hold a choice (e.g. one made offline): keep the later time of each field. */
+export function mergeRediscovery(a?: RediscoveryState, b?: RediscoveryState): RediscoveryState {
+  const dismissedAt = later(a?.dismissedAt, b?.dismissedAt);
+  const snoozedUntil = later(a?.snoozedUntil, b?.snoozedUntil);
+  return { ...(dismissedAt ? { dismissedAt } : {}), ...(snoozedUntil ? { snoozedUntil } : {}) };
+}
+
 export const store = {
   subscribe(listener: () => void) {
     listeners.add(listener);
@@ -104,6 +113,8 @@ export const store = {
     links: Link[];
     tags: TagCount[];
     reminders: Reminder[];
+    /** Server-side snooze / dismiss choices; merged with what this device holds (the later time wins). */
+    rediscovery?: Record<string, RediscoveryState>;
   }) {
     const byId = new Map(state.memories.map((m) => [m.id, m]));
     // Paging a list that changes underneath us can return the same row twice; keep one.
@@ -113,7 +124,11 @@ export const store = {
     const remindersById: Record<string, Reminder> = {};
     for (const r of data.reminders) if (alive.has(r.memoryId)) remindersById[r.memoryId] = r;
     // Dismiss / snooze choices for memories that no longer exist are dropped with them.
-    const rediscovery = Object.fromEntries(Object.entries(state.rediscovery).filter(([id]) => alive.has(id)));
+    const rediscovery: Record<string, RediscoveryState> = {};
+    for (const id of new Set([...Object.keys(state.rediscovery), ...Object.keys(data.rediscovery ?? {})])) {
+      if (!alive.has(id)) continue;
+      rediscovery[id] = mergeRediscovery(state.rediscovery[id], data.rediscovery?.[id]);
+    }
     setState({
       profile: data.profile ?? state.profile,
       memories: withLinkedIds(memories, [...new Map(data.links.map((l) => [l.id, l])).values()]),

@@ -7,6 +7,8 @@ import { signOut } from '@/auth/session';
 import { Button, ConfirmDialog, Icon, Screen, Text, useToast } from '@/components/ui';
 import { useProfile } from '@/data/hooks';
 import { canSearchByMeaning, statusOf, useSemanticState } from '@/features/semantic/status';
+import { DeleteAccountSheet } from '@/features/settings/DeleteAccountSheet';
+import { PasswordSheet } from '@/features/settings/PasswordSheet';
 import { PrivacySheet } from '@/features/settings/PrivacySheet';
 import { NotificationsSheet } from '@/features/settings/NotificationsSheet';
 import { SemanticSearchSheet } from '@/features/settings/SemanticSearchSheet';
@@ -29,6 +31,8 @@ export default function SettingsScreen() {
   const [notifications, setNotifications] = useState(false);
   const [semanticOpen, setSemanticOpen] = useState(false);
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const semantic = statusOf(useSemanticState());
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -54,6 +58,7 @@ export default function SettingsScreen() {
       <SectionHeader title="Preferences" />
       <View style={styles.list}>
         <ListRow icon="user" title="Profile" subtitle="Name and email" onPress={() => setEditing(true)} />
+        <ListRow icon="lock" title="Password" subtitle="Change your password" onPress={() => setPasswordOpen(true)} />
         <ListRow icon="eye" title="Theme" subtitle="Appearance" comingSoon />
         <ListRow icon="lock" title="Privacy" subtitle="Offline copy and local data" onPress={() => setPrivacyOpen(true)} />
         <ListRow icon="bell" title="Notifications" subtitle="Reminders" onPress={() => setNotifications(true)} />
@@ -64,6 +69,9 @@ export default function SettingsScreen() {
           onPress={() => setSemanticOpen(true)}
         />
       </View>
+
+      <SectionHeader title="Danger zone" />
+      <ListRow icon="lock" title="Delete account" subtitle="Permanently remove your account and memories" onPress={() => setDeleteOpen(true)} />
 
       {__DEV__ && (
         <>
@@ -83,6 +91,8 @@ export default function SettingsScreen() {
 
       <ProfileSheet visible={editing} onClose={() => setEditing(false)} profile={profile} />
       <NotificationsSheet visible={notifications} onClose={() => setNotifications(false)} />
+      <PasswordSheet visible={passwordOpen} onClose={() => setPasswordOpen(false)} />
+      <DeleteAccountSheet visible={deleteOpen} onClose={() => setDeleteOpen(false)} />
       <PrivacySheet visible={privacyOpen} onClose={() => setPrivacyOpen(false)} />
       <SemanticSearchSheet visible={semanticOpen} onClose={() => setSemanticOpen(false)} />
       <ConfirmDialog

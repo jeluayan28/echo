@@ -29,6 +29,8 @@ export type SearchRequest = {
   sort: SearchSort;
   /** Ask for search by meaning. Only honoured when the server says it works; see `SearchOutcome`. */
   semantic?: boolean;
+  /** Server-backed providers: how many pages of results to fetch (default `DEFAULT_PAGES`). Grows on "Show more". */
+  pages?: number;
 };
 
 /** How the search was really answered, so the UI never claims more than it delivered. */

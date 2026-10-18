@@ -29,13 +29,13 @@ TO DO - DO FIRST
 
 TO DO - UNFINISHED FEATURES
 ---------------------------
-[ ] Rediscovery snooze/dismiss: add an API endpoint + save it; today it lives on the device and resets on restart
-[ ] Settings: build Theme (row still says "Soon"). Privacy is built: offline-copy switch + clear button.
-[ ] Settings: app lock (Face ID / passcode before opening ECHO) - not built
-[ ] Settings: password-change screen and delete-account screen (the API already supports both)
-[ ] Settings: notification quiet hours (API supports it, no UI)
-[ ] Search: infinite scroll (today it shows the best 200 matches, 4 pages of 50)
-[ ] Voice playback: refresh the signed audio link when it expires (links last 10 minutes; reopen the memory for now)
+[x] Rediscovery snooze/dismiss: saved on the server (GET /rediscovery, PUT /memories/{id}/rediscovery), merged on sync, offline choices pushed on next sync
+[ ] Settings: build Theme (row still says "Soon"; colors are a static module used by every screen, so a light theme is a large refactor). Privacy is built: offline-copy switch + clear button.
+[ ] Settings: app lock (Face ID / passcode before opening ECHO) - not built; needs expo-local-authentication, i.e. a development build
+[x] Settings: password-change sheet and delete-account sheet (built 2026-10-18; not yet seen on a device)
+[x] Settings: notification quiet hours, preset windows (saved to the account; the device does NOT yet hold back notifications during them)
+[x] Search: "Load more results" fetches 4 more pages at a time, up to 2000
+[x] Voice playback: fresh signed link fetched before playing an old one, and once if loading fails
 
 TO DO - RELIABILITY / SCALE
 ---------------------------

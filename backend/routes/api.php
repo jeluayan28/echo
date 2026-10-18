@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\LinkController;
 use App\Http\Controllers\Api\V1\MemoryController;
 use App\Http\Controllers\Api\V1\NotificationPreferenceController;
 use App\Http\Controllers\Api\V1\ProfileController;
+use App\Http\Controllers\Api\V1\RediscoveryController;
 use App\Http\Controllers\Api\V1\ReminderController;
 use App\Http\Controllers\Api\V1\SearchController;
 use App\Http\Controllers\Api\V1\SemanticSearchController;
@@ -50,6 +51,10 @@ Route::prefix('v1')->name('v1.')->group(function () {
         Route::post('memories/{memory}/open', [MemoryController::class, 'open'])->name('memories.open');
         Route::post('memories/{memory}/restore', [MemoryController::class, 'restore'])->withTrashed()->name('memories.restore');
         Route::delete('memories/{memory}/force', [MemoryController::class, 'forceDestroy'])->withTrashed()->name('memories.force');
+
+        // Rediscovery choices (snooze / dismiss)
+        Route::get('rediscovery', [RediscoveryController::class, 'index'])->name('rediscovery.index');
+        Route::put('memories/{memory}/rediscovery', [RediscoveryController::class, 'upsert'])->name('memories.rediscovery.upsert');
 
         // Relationships between memories
         Route::get('links', [LinkController::class, 'index'])->name('links.index');

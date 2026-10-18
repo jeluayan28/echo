@@ -8,7 +8,7 @@ import { Platform } from 'react-native';
 import { UploadError, friendlyFieldError } from '@/data/errors';
 import type { LocalFile } from '@/data/types';
 
-import { buildUrl, getAuthToken, notifyUnauthorized, parseErrorBody } from '../client';
+import { buildUrl, getAuthToken, http, notifyUnauthorized, parseErrorBody } from '../client';
 import type { AttachmentDto, Envelope } from '../dto';
 
 export type UploadOptions = { onProgress?: (fraction: number) => void; signal?: AbortSignal };
@@ -80,4 +80,9 @@ export async function uploadAttachment(file: LocalFile, { onProgress, signal }: 
     signal?.addEventListener('abort', onAbort);
     xhr.send(form);
   });
+}
+
+/** Fresh metadata, including a newly signed `stream_url` (the one issued with the memory expires after 10 minutes). */
+export async function getAttachment(id: string, signal?: AbortSignal): Promise<AttachmentDto> {
+  return (await http.get<Envelope<AttachmentDto>>(`/attachments/${encodeURIComponent(id)}`, { signal })).data;
 }

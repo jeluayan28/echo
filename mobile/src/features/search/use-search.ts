@@ -37,8 +37,8 @@ export function useSearch(
     [memories],
   );
   const key = useMemo(
-    () => JSON.stringify([request.query.trim(), request.filters, request.sort, !!request.semantic, attempt, dataVersion]),
-    [request.query, request.filters, request.sort, request.semantic, attempt, dataVersion],
+    () => JSON.stringify([request.query.trim(), request.filters, request.sort, !!request.semantic, request.pages, attempt, dataVersion]),
+    [request.query, request.filters, request.sort, request.semantic, request.pages, attempt, dataVersion],
   );
 
   const readsCache = providers.some((p) => p.local);

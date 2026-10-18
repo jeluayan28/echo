@@ -99,6 +99,9 @@ export type TagCount = { tag: string; count: number };
 export type NotificationSettings = {
   remindersEnabled: boolean;
   timezone: string;
+  /** "HH:mm" in the account's timezone; both set or both null. */
+  quietHoursStart: string | null;
+  quietHoursEnd: string | null;
 };
 
 /** What the create/edit form produces. `attachment` must already be uploaded. */

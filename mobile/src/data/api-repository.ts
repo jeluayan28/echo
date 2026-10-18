@@ -9,7 +9,7 @@
  *  4. Reads that fail never half-fill the cache: `sync()` replaces everything or nothing.
  *  5. An edit carries the version it was based on; a newer server version wins and the user chooses (docs/OFFLINE.md).
  */
-import { attachmentsApi, collectionsApi, linksApi, memoriesApi, profileApi, remindersApi, tagsApi } from '@/api';
+import { attachmentsApi, collectionsApi, linksApi, memoriesApi, profileApi, rediscoveryApi, remindersApi, tagsApi } from '@/api';
 import { ApiError, ConflictError } from '@/api/client';
 import {
   toAttachment,
@@ -19,11 +19,12 @@ import {
   toMemoryFromSummary,
   toMemoryPayload,
   toProfile,
+  toRediscoveryState,
   toReminder,
   toTagCount,
 } from '@/api/mappers';
 
-import type { MemoryDto } from '@/api/dto';
+import type { MemoryDto, RediscoveryStateDto } from '@/api/dto';
 
 import type { EchoRepository } from './repository';
 import { store } from './store';
@@ -86,18 +87,39 @@ function forgetIfGone(epoch: number, id: string, error: unknown) {
   if (isStatus(error, 404)) applyIfCurrent(epoch, () => store.removeMemory(id));
 }
 
+/**
+ * Rediscovery choices apply on the device straight away; the server copy is best-effort. A save that fails
+ * (offline) stays on this device and is pushed again by the next sync, so nothing is lost and the UI never waits.
+ */
+function saveRediscovery(id: string, patch: { dismissed_at?: string; snoozed_until?: string }) {
+  void rediscoveryApi.saveState(id, patch).catch(() => undefined);
+}
+
+function pushLocalRediscovery(epoch: number, server: Map<string, RediscoveryStateDto>) {
+  if (store.epoch() !== epoch) return;
+  for (const [id, local] of Object.entries(store.getState().rediscovery)) {
+    const remote = server.get(id);
+    const patch: { dismissed_at?: string; snoozed_until?: string } = {};
+    if (local.dismissedAt && local.dismissedAt > (remote?.dismissed_at ?? '')) patch.dismissed_at = local.dismissedAt;
+    if (local.snoozedUntil && local.snoozedUntil > (remote?.snoozed_until ?? '')) patch.snoozed_until = local.snoozedUntil;
+    if (Object.keys(patch).length > 0) saveRediscovery(id, patch);
+  }
+}
+
 // ── repository ──────────────────────────────────────────────────────────────
 
 export const apiRepository: EchoRepository = {
   async sync() {
     const epoch = store.epoch();
-    const [me, collections, memories, links, tags, reminders] = await Promise.all([
+    const [me, collections, memories, links, tags, reminders, states] = await Promise.all([
       profileApi.getMe(),
       collectionsApi.listCollections(),
       memoriesApi.listAllMemories(),
       linksApi.listLinks(),
       tagsApi.listTags(),
       remindersApi.listReminders(),
+      // Optional: an older server without the endpoint just keeps the device-local choices.
+      rediscoveryApi.listStates().catch(() => undefined),
     ]);
     applyIfCurrent(epoch, () =>
       store.replaceAll({
@@ -108,8 +130,10 @@ export const apiRepository: EchoRepository = {
         tags: tags.items.map(toTagCount),
         // A completed reminder has been fulfilled; only pending ones are shown.
         reminders: reminders.items.filter((r) => !r.completed_at).map(toReminder),
+        rediscovery: states && Object.fromEntries(states.map((s) => [s.memory_id, toRediscoveryState(s)])),
       }),
     );
+    if (states) pushLocalRediscovery(epoch, new Map(states.map((s) => [s.memory_id, s])));
   },
 
   async loadMemory(id, { open = false, signal } = {}) {
@@ -233,10 +257,13 @@ export const apiRepository: EchoRepository = {
   },
 
   async dismissRediscovery(id) {
-    store.dismissRediscovery(id); // device-local: the API has no endpoint for it
+    const at = new Date().toISOString();
+    store.dismissRediscovery(id, at);
+    saveRediscovery(id, { dismissed_at: at });
   },
   async snoozeRediscovery(id, until) {
     store.snoozeRediscovery(id, until);
+    saveRediscovery(id, { snoozed_until: until });
   },
 
   saveReminder(reminder) {

@@ -133,6 +133,12 @@ export async function signOut(): Promise<void> {
   set({ status: 'signedOut' });
 }
 
+/** The account no longer exists on the server: wipe this device and return to sign-in. */
+export async function accountDeleted(): Promise<void> {
+  await wipeLocalData();
+  set({ status: 'signedOut' });
+}
+
 /** The server rejected our token: drop the session and tell the user why. */
 export function expireSession(): void {
   if (state.status !== 'signedIn') return;

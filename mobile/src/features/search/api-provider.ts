@@ -12,9 +12,10 @@ import { mergeMemory, store } from '@/data/store';
 
 import { applyFilters, lexicalProvider, tokenize, type SearchOutcome, type SearchProvider } from './engine';
 
-const PER_PAGE = 50;
-/** Search shows the best 200 matches; refining the query is better than paging through thousands. */
-const MAX_PAGES = 4;
+export const PER_PAGE = 50;
+/** Search starts with the best 200 matches; "Show more" asks for further pages, up to a hard ceiling. */
+export const DEFAULT_PAGES = 4;
+export const MAX_PAGES = 40;
 
 export const apiSearchProvider: SearchProvider = {
   id: 'api',
@@ -25,8 +26,9 @@ export const apiSearchProvider: SearchProvider = {
     const cache = new Map(store.getState().memories.map((m) => [m.id, m]));
     const memories = [];
     let outcome: SearchOutcome | undefined;
+    const pages = Math.min(request.pages ?? DEFAULT_PAGES, MAX_PAGES);
     try {
-      for (let page = 1; page <= MAX_PAGES; page++) {
+      for (let page = 1; page <= pages; page++) {
         const res = await searchApi.searchMemories({
           q: request.query.trim().slice(0, 200),
           mode: request.semantic ? 'semantic' : undefined,

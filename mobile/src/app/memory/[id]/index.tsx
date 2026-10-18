@@ -3,6 +3,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
+import { attachmentsApi } from '@/api';
+import { toAttachment } from '@/api/mappers';
 import { ScreenHeader, SectionHeader } from '@/components/layout';
 import { Button, Chip, ConfirmDialog, ErrorState, IconButton, Reveal, Screen, Skeleton, Text, useToast } from '@/components/ui';
 import { memoryActions, useCollection, useMemories, useMemoryDetail, useSuggestions } from '@/data/hooks';
@@ -139,7 +141,11 @@ export default function MemoryDetailScreen() {
       )}
       {attachment && !!attachment.uri && (
         <View style={{ gap: spacing.xxs }}>
-          <VoicePlayer uri={attachment.uri} durationMs={attachment.durationMs} />
+          <VoicePlayer
+            uri={attachment.uri}
+            durationMs={attachment.durationMs}
+            refreshUri={async () => toAttachment(await attachmentsApi.getAttachment(attachment.id)).uri}
+          />
           <Text variant="caption" tone="muted">
             {[attachment.durationMs ? formatDuration(attachment.durationMs) : '', formatBytes(attachment.sizeBytes)]
               .filter(Boolean)

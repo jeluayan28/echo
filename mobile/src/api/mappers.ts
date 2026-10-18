@@ -7,6 +7,7 @@ import type {
   MemoryInput,
   NotificationSettings,
   Profile,
+  RediscoveryState,
   Reminder,
   TagCount,
 } from '@/data/types';
@@ -18,6 +19,7 @@ import type {
   MemoryDto,
   MemorySummaryDto,
   PreferencesDto,
+  RediscoveryStateDto,
   ReminderDto,
   TagDto,
   UserDto,
@@ -100,9 +102,16 @@ export const toReminder = (dto: ReminderDto): Reminder => ({
   createdAt: dto.created_at ?? dto.remind_at,
 });
 
+export const toRediscoveryState = (dto: RediscoveryStateDto): RediscoveryState => ({
+  ...(dto.dismissed_at ? { dismissedAt: dto.dismissed_at } : {}),
+  ...(dto.snoozed_until ? { snoozedUntil: dto.snoozed_until } : {}),
+});
+
 export const toNotificationSettings = (dto: PreferencesDto): NotificationSettings => ({
   remindersEnabled: dto.reminders_enabled,
   timezone: dto.timezone,
+  quietHoursStart: dto.quiet_hours_start?.slice(0, 5) ?? null,
+  quietHoursEnd: dto.quiet_hours_end?.slice(0, 5) ?? null,
 });
 
 // ── app → wire ────────────────────────────────────────────────────────────────
