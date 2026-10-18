@@ -1,11 +1,11 @@
 ECHO - TO DO LIST
 =================
-Updated: 2026-10-14
+Updated: 2026-10-18
 
 WHERE YOU ARE
 -------------
 The mobile app is connected to the Laravel API. No sample data is left.
-Verified by tests: backend 176 tests, mobile 228 tests, plus a 19-step live test against a running API and PostgreSQL.
+Verified by tests (2026-10-18): backend 217 passed (23 skipped), mobile 384 passed (27 skipped), tsc clean, plus a 19-step live test against a running API and PostgreSQL.
 NOT verified: running the UI on a phone, an emulator or a browser.
 
 HOW TO RUN IT
@@ -65,9 +65,21 @@ Done: failure-mode tests (offline / 500 / 429 / 401 / deleted records / duplicat
     the register -> create -> edit -> search -> sign-out run still needs a clean result and a look at the screenshots.
     Needs: throwaway Postgres on port 54329, API on :8000, web export served on :8081.
     After changing EXPO_PUBLIC_* values run "npx expo export --clear" (Metro caches the old values).
-[ ] FIRST: the run's note body ("Written by the UI test.") never appeared on the detail screen, and edit/favorite/search/
+[~] (2026-10-18, code review only) The save path for the body looks correct end to end: MemoryEditor -> save-memory ->
+    mappers.ts -> MemoryWriter/MemoryResource, and live-api.e2e.test.ts asserts body on create, update and open.
+    Most likely the script typed into the wrong field (Title Enter moves focus to Content). The browser run itself was NOT repeated
+    (the script and screenshots are gone). Re-run with a fresh script, targeting the field labelled "Content".
+    Original note: the run's note body ("Written by the UI test.") never appeared on the detail screen, and edit/favorite/search/
     sign-back-in failed after it. Check whether the body is saved (look at ui-fail-create-a-note*.png, query the API)
     or whether the script typed into the wrong field. Everything else in that run passed (register, empty state, greeting,
     triple-click Save = 1 memory, collection, map, settings, sign-out, redirect).
 [ ] Fix whatever that run finds, then re-run the full QA and write the report.
+
+DREAM MODE (committed 2026-10-17 as "not complete")
+---------------------------------------------------
+Built: /dream screen, Memory Core entry + daily discovery card, preferences, connect + reflect sheets, device-local history
+(erased on sign-in/out). tsc clean, 27 dream tests pass. Nothing missing was found in the code.
+[ ] Run it on a device / browser: intro -> start -> bookmark/skip/connect/reflect -> finish -> summary; daily card dismiss.
+[ ] Decide whether connections/reflections need to persist beyond the device (history is local only today).
+
 Known limits: a session that expires while a form is open loses that unsaved draft.
